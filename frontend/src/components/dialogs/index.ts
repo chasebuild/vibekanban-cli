@@ -88,6 +88,10 @@ export {
   StartReviewDialog,
   type StartReviewDialogProps,
 } from './tasks/StartReviewDialog';
+export {
+  SwarmExecutionDialog,
+  type SwarmExecutionDialogProps,
+} from './tasks/SwarmExecutionDialog';
 
 // Auth dialogs
 export { GhCliSetupDialog } from './auth/GhCliSetupDialog';

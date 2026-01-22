@@ -1,0 +1,26 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT\n                t.project_id AS \"project_id!: Uuid\",\n                COUNT(DISTINCT t.id) AS \"running_count!: i64\"\n            FROM tasks t\n            JOIN workspaces w ON w.task_id = t.id\n            JOIN sessions s ON s.workspace_id = w.id\n            JOIN execution_processes ep ON ep.session_id = s.id\n            WHERE ep.status = 'running'\n              AND ep.run_reason IN ('setupscript', 'cleanupscript', 'codingagent')\n            GROUP BY t.project_id",
+  "describe": {
+    "columns": [
+      {
+        "name": "project_id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Blob"
+      },
+      {
+        "name": "running_count!: i64",
+        "ordinal": 1,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false
+    ]
+  },
+  "hash": "683df09b716e24647e2568a20bf725d3deb54e389663e3feb6bf9274657d56ca"
+}

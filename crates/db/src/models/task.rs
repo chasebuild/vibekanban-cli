@@ -22,6 +22,21 @@ pub enum TaskStatus {
     Cancelled,
 }
 
+#[derive(
+    Debug, Clone, Type, Serialize, Deserialize, PartialEq, TS, EnumString, Display, Default,
+)]
+#[sqlx(type_name = "TEXT", rename_all = "lowercase")]
+#[serde(rename_all = "lowercase")]
+#[strum(serialize_all = "lowercase")]
+pub enum TaskComplexity {
+    Trivial,
+    Simple,
+    #[default]
+    Moderate,
+    Complex,
+    Epic,
+}
+
 #[derive(Debug, Clone, FromRow, Serialize, Deserialize, TS)]
 pub struct Task {
     pub id: Uuid,
@@ -30,6 +45,9 @@ pub struct Task {
     pub description: Option<String>,
     pub status: TaskStatus,
     pub parent_workspace_id: Option<Uuid>, // Foreign key to parent Workspace
+    pub is_epic: bool,                     // Whether this is an epic task for swarm execution
+    pub complexity: Option<TaskComplexity>, // Estimated complexity
+    pub metadata: Option<String>,          // JSON metadata for additional properties
     pub created_at: DateTime<Utc>,
     pub updated_at: DateTime<Utc>,
 }
@@ -72,6 +90,9 @@ pub struct CreateTask {
     pub status: Option<TaskStatus>,
     pub parent_workspace_id: Option<Uuid>,
     pub image_ids: Option<Vec<Uuid>>,
+    pub is_epic: Option<bool>,
+    pub complexity: Option<TaskComplexity>,
+    pub metadata: Option<String>,
 }
 
 impl CreateTask {
@@ -87,7 +108,16 @@ impl CreateTask {
             status: Some(TaskStatus::Todo),
             parent_workspace_id: None,
             image_ids: None,
+            is_epic: None,
+            complexity: None,
+            metadata: None,
         }
+    }
+
+    pub fn as_epic(mut self) -> Self {
+        self.is_epic = Some(true);
+        self.complexity = Some(TaskComplexity::Epic);
+        self
     }
 }
 
@@ -98,6 +128,20 @@ pub struct UpdateTask {
     pub status: Option<TaskStatus>,
     pub parent_workspace_id: Option<Uuid>,
     pub image_ids: Option<Vec<Uuid>>,
+    pub is_epic: Option<bool>,
+    pub complexity: Option<TaskComplexity>,
+    pub metadata: Option<String>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize, TS)]
+pub struct ProjectTaskStats {
+    pub project_id: Uuid,
+    pub todo_count: i64,
+    pub inprogress_count: i64,
+    pub inreview_count: i64,
+    pub done_count: i64,
+    pub cancelled_count: i64,
+    pub running_count: i64,
 }
 
 impl Task {
@@ -125,6 +169,9 @@ impl Task {
   t.description,
   t.status                        AS "status!: TaskStatus",
   t.parent_workspace_id           AS "parent_workspace_id: Uuid",
+  t.is_epic                       AS "is_epic!: bool",
+  t.complexity                    AS "complexity: TaskComplexity",
+  t.metadata,
   t.created_at                    AS "created_at!: DateTime<Utc>",
   t.updated_at                    AS "updated_at!: DateTime<Utc>",
 
@@ -177,6 +224,9 @@ ORDER BY t.created_at DESC"#,
                     description: rec.description,
                     status: rec.status,
                     parent_workspace_id: rec.parent_workspace_id,
+                    is_epic: rec.is_epic,
+                    complexity: rec.complexity,
+                    metadata: rec.metadata,
                     created_at: rec.created_at,
                     updated_at: rec.updated_at,
                 },
@@ -192,7 +242,10 @@ ORDER BY t.created_at DESC"#,
     pub async fn find_by_id(pool: &SqlitePool, id: Uuid) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Task,
-            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, 
+               status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid",
+               is_epic as "is_epic!: bool", complexity as "complexity: TaskComplexity", metadata,
+               created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
                FROM tasks
                WHERE id = $1"#,
             id
@@ -204,7 +257,10 @@ ORDER BY t.created_at DESC"#,
     pub async fn find_by_rowid(pool: &SqlitePool, rowid: i64) -> Result<Option<Self>, sqlx::Error> {
         sqlx::query_as!(
             Task,
-            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, 
+               status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid",
+               is_epic as "is_epic!: bool", complexity as "complexity: TaskComplexity", metadata,
+               created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
                FROM tasks
                WHERE rowid = $1"#,
             rowid
@@ -219,17 +275,24 @@ ORDER BY t.created_at DESC"#,
         task_id: Uuid,
     ) -> Result<Self, sqlx::Error> {
         let status = data.status.clone().unwrap_or_default();
+        let is_epic = data.is_epic.unwrap_or(false);
         sqlx::query_as!(
             Task,
-            r#"INSERT INTO tasks (id, project_id, title, description, status, parent_workspace_id)
-               VALUES ($1, $2, $3, $4, $5, $6)
-               RETURNING id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
+            r#"INSERT INTO tasks (id, project_id, title, description, status, parent_workspace_id, is_epic, complexity, metadata)
+               VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)
+               RETURNING id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, 
+               status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid",
+               is_epic as "is_epic!: bool", complexity as "complexity: TaskComplexity", metadata,
+               created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
             task_id,
             data.project_id,
             data.title,
             data.description,
             status,
-            data.parent_workspace_id
+            data.parent_workspace_id,
+            is_epic,
+            data.complexity,
+            data.metadata
         )
         .fetch_one(pool)
         .await
@@ -249,7 +312,10 @@ ORDER BY t.created_at DESC"#,
             r#"UPDATE tasks
                SET title = $3, description = $4, status = $5, parent_workspace_id = $6
                WHERE id = $1 AND project_id = $2
-               RETURNING id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
+               RETURNING id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, 
+               status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid",
+               is_epic as "is_epic!: bool", complexity as "complexity: TaskComplexity", metadata,
+               created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>""#,
             id,
             project_id,
             title,
@@ -259,6 +325,76 @@ ORDER BY t.created_at DESC"#,
         )
         .fetch_one(pool)
         .await
+    }
+
+    /// Find all epic tasks for a project
+    pub async fn find_epic_tasks(
+        pool: &SqlitePool,
+        project_id: Uuid,
+    ) -> Result<Vec<Self>, sqlx::Error> {
+        sqlx::query_as!(
+            Task,
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, 
+               status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid",
+               is_epic as "is_epic!: bool", complexity as "complexity: TaskComplexity", metadata,
+               created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
+               FROM tasks
+               WHERE project_id = $1 AND is_epic = 1
+               ORDER BY created_at DESC"#,
+            project_id
+        )
+        .fetch_all(pool)
+        .await
+    }
+
+    /// Set a task as epic
+    pub async fn set_epic(
+        pool: &SqlitePool,
+        id: Uuid,
+        is_epic: bool,
+    ) -> Result<(), sqlx::Error> {
+        let complexity = if is_epic { Some(TaskComplexity::Epic) } else { None };
+        sqlx::query!(
+            "UPDATE tasks SET is_epic = $2, complexity = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+            id,
+            is_epic,
+            complexity
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Update task complexity
+    pub async fn set_complexity(
+        pool: &SqlitePool,
+        id: Uuid,
+        complexity: TaskComplexity,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            "UPDATE tasks SET complexity = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+            id,
+            complexity
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
+    }
+
+    /// Update task metadata
+    pub async fn set_metadata(
+        pool: &SqlitePool,
+        id: Uuid,
+        metadata: &str,
+    ) -> Result<(), sqlx::Error> {
+        sqlx::query!(
+            "UPDATE tasks SET metadata = $2, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
+            id,
+            metadata
+        )
+        .execute(pool)
+        .await?;
+        Ok(())
     }
 
     pub async fn update_status(
@@ -327,7 +463,10 @@ ORDER BY t.created_at DESC"#,
         // Find only child tasks that have this workspace as their parent
         sqlx::query_as!(
             Task,
-            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid", created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
+            r#"SELECT id as "id!: Uuid", project_id as "project_id!: Uuid", title, description, 
+               status as "status!: TaskStatus", parent_workspace_id as "parent_workspace_id: Uuid",
+               is_epic as "is_epic!: bool", complexity as "complexity: TaskComplexity", metadata,
+               created_at as "created_at!: DateTime<Utc>", updated_at as "updated_at!: DateTime<Utc>"
                FROM tasks
                WHERE parent_workspace_id = $1
                ORDER BY created_at DESC"#,
@@ -369,5 +508,61 @@ ORDER BY t.created_at DESC"#,
             current_workspace: workspace.clone(),
             children,
         })
+    }
+
+    /// Get task stats for all projects
+    pub async fn get_all_projects_stats(
+        pool: &SqlitePool,
+    ) -> Result<Vec<ProjectTaskStats>, sqlx::Error> {
+        // First get status counts per project
+        let status_records = sqlx::query!(
+            r#"SELECT
+                p.id AS "project_id!: Uuid",
+                COALESCE(SUM(CASE WHEN t.status = 'todo' THEN 1 ELSE 0 END), 0) AS "todo_count!: i64",
+                COALESCE(SUM(CASE WHEN t.status = 'inprogress' THEN 1 ELSE 0 END), 0) AS "inprogress_count!: i64",
+                COALESCE(SUM(CASE WHEN t.status = 'inreview' THEN 1 ELSE 0 END), 0) AS "inreview_count!: i64",
+                COALESCE(SUM(CASE WHEN t.status = 'done' THEN 1 ELSE 0 END), 0) AS "done_count!: i64",
+                COALESCE(SUM(CASE WHEN t.status = 'cancelled' THEN 1 ELSE 0 END), 0) AS "cancelled_count!: i64"
+            FROM projects p
+            LEFT JOIN tasks t ON t.project_id = p.id
+            GROUP BY p.id"#
+        )
+        .fetch_all(pool)
+        .await?;
+
+        // Get running task counts per project
+        let running_records = sqlx::query!(
+            r#"SELECT
+                t.project_id AS "project_id!: Uuid",
+                COUNT(DISTINCT t.id) AS "running_count!: i64"
+            FROM tasks t
+            JOIN workspaces w ON w.task_id = t.id
+            JOIN sessions s ON s.workspace_id = w.id
+            JOIN execution_processes ep ON ep.session_id = s.id
+            WHERE ep.status = 'running'
+              AND ep.run_reason IN ('setupscript', 'cleanupscript', 'codingagent')
+            GROUP BY t.project_id"#
+        )
+        .fetch_all(pool)
+        .await?;
+
+        // Build a map of running counts
+        let running_map: std::collections::HashMap<Uuid, i64> = running_records
+            .into_iter()
+            .map(|r| (r.project_id, r.running_count))
+            .collect();
+
+        Ok(status_records
+            .into_iter()
+            .map(|rec| ProjectTaskStats {
+                project_id: rec.project_id,
+                todo_count: rec.todo_count,
+                inprogress_count: rec.inprogress_count,
+                inreview_count: rec.inreview_count,
+                done_count: rec.done_count,
+                cancelled_count: rec.cancelled_count,
+                running_count: *running_map.get(&rec.project_id).unwrap_or(&0),
+            })
+            .collect())
     }
 }

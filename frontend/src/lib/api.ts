@@ -29,6 +29,7 @@ import {
   Tag,
   TagSearchParams,
   TaskWithAttemptStatus,
+  ProjectTaskStats,
   UpdateProject,
   UpdateTask,
   UpdateTag,
@@ -398,6 +399,11 @@ export const tasksApi = {
       method: 'DELETE',
     });
     return handleApiResponse<void>(response);
+  },
+
+  getAllProjectsStats: async (): Promise<ProjectTaskStats[]> => {
+    const response = await makeRequest('/api/tasks/stats/all-projects');
+    return handleApiResponse<ProjectTaskStats[]>(response);
   },
 };
 

@@ -1,4 +1,7 @@
+pub mod agent_profile;
+pub mod agent_skill;
 pub mod coding_agent_turn;
+pub mod consensus_review;
 pub mod execution_process;
 pub mod execution_process_logs;
 pub mod execution_process_repo_state;
@@ -9,6 +12,8 @@ pub mod project_repo;
 pub mod repo;
 pub mod scratch;
 pub mod session;
+pub mod swarm_execution;
+pub mod swarm_task;
 pub mod tag;
 pub mod task;
 pub mod workspace;

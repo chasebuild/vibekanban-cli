@@ -1,14 +1,17 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { KanbanCard } from '@/components/ui/shadcn-io/kanban';
-import { Link, Loader2, XCircle } from 'lucide-react';
+import { Link, Loader2, XCircle, Users, Crown } from 'lucide-react';
 import type { TaskWithAttemptStatus } from 'shared/types';
 import { ActionsDropdown } from '@/components/ui/actions-dropdown';
 import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
 import { useNavigateWithSearch } from '@/hooks';
 import { paths } from '@/lib/paths';
 import { attemptsApi } from '@/lib/api';
 import { TaskCardHeader } from './TaskCardHeader';
 import { useTranslation } from 'react-i18next';
+import NiceModal from '@ebay/nice-modal-react';
+import { SwarmExecutionDialog } from '@/components/dialogs';
 
 type Task = TaskWithAttemptStatus;
 
@@ -60,6 +63,17 @@ export function TaskCard({
     [task.parent_workspace_id, projectId, navigate, isNavigatingToParent]
   );
 
+  const handleSwarmClick = useCallback(
+    (e: React.MouseEvent) => {
+      e.stopPropagation();
+      NiceModal.show(SwarmExecutionDialog, {
+        taskId: task.id,
+        taskTitle: task.title,
+      });
+    },
+    [task.id, task.title]
+  );
+
   const localRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
@@ -96,6 +110,19 @@ export function TaskCard({
               {task.last_attempt_failed && (
                 <XCircle className="h-4 w-4 text-destructive" />
               )}
+              {/* Epic task indicator and swarm button */}
+              {task.is_epic && (
+                <Button
+                  variant="icon"
+                  onClick={handleSwarmClick}
+                  onPointerDown={(e) => e.stopPropagation()}
+                  onMouseDown={(e) => e.stopPropagation()}
+                  title="Manage Agent Swarm"
+                  className="text-purple-600 hover:text-purple-700"
+                >
+                  <Users className="h-4 w-4" />
+                </Button>
+              )}
               {task.parent_workspace_id && (
                 <Button
                   variant="icon"
@@ -112,6 +139,20 @@ export function TaskCard({
             </>
           }
         />
+        {/* Epic task badge */}
+        {task.is_epic && (
+          <div className="flex items-center gap-1">
+            <Badge className="bg-purple-600 text-xs flex items-center gap-1">
+              <Crown className="h-3 w-3" />
+              Epic
+            </Badge>
+            {task.complexity && (
+              <Badge variant="outline" className="text-xs">
+                {task.complexity}
+              </Badge>
+            )}
+          </div>
+        )}
         {task.description && (
           <p className="text-sm text-secondary-foreground break-words">
             {task.description.length > 130

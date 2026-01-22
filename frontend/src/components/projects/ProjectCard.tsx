@@ -1,5 +1,6 @@
 import {
   Card,
+  CardContent,
   CardDescription,
   CardHeader,
   CardTitle,
@@ -13,15 +14,21 @@ import {
 import { Button } from '@/components/ui/button.tsx';
 import {
   Calendar,
+  CheckCircle2,
+  Circle,
   Edit,
   ExternalLink,
+  Eye,
   FolderOpen,
   Link2,
+  Loader2,
   MoreHorizontal,
+  PlayCircle,
   Trash2,
   Unlink,
+  XCircle,
 } from 'lucide-react';
-import { Project } from 'shared/types';
+import { Project, ProjectTaskStats } from 'shared/types';
 import { useEffect, useRef } from 'react';
 import { useOpenProjectInEditor } from '@/hooks/useOpenProjectInEditor';
 import { useNavigateWithSearch, useProjectRepos } from '@/hooks';
@@ -35,9 +42,16 @@ type Props = {
   isFocused: boolean;
   setError: (error: string) => void;
   onEdit: (project: Project) => void;
+  taskStats?: ProjectTaskStats;
 };
 
-function ProjectCard({ project, isFocused, setError, onEdit }: Props) {
+function ProjectCard({
+  project,
+  isFocused,
+  setError,
+  onEdit,
+  taskStats,
+}: Props) {
   const navigate = useNavigateWithSearch();
   const ref = useRef<HTMLDivElement>(null);
   const handleOpenInEditor = useOpenProjectInEditor(project);
@@ -193,6 +207,63 @@ function ProjectCard({ project, isFocused, setError, onEdit }: Props) {
           })}
         </CardDescription>
       </CardHeader>
+      {taskStats && (
+        <CardContent className="pt-0 pb-4">
+          <div className="flex flex-wrap gap-3 text-xs text-muted-foreground">
+            {taskStats.running_count > 0 && (
+              <div
+                className="flex items-center gap-1 text-blue-500"
+                title="Running"
+              >
+                <Loader2 className="h-3 w-3 animate-spin" />
+                <span>{taskStats.running_count}</span>
+              </div>
+            )}
+            {taskStats.todo_count > 0 && (
+              <div className="flex items-center gap-1" title="Todo">
+                <Circle className="h-3 w-3" />
+                <span>{taskStats.todo_count}</span>
+              </div>
+            )}
+            {taskStats.inprogress_count > 0 && (
+              <div
+                className="flex items-center gap-1 text-yellow-500"
+                title="In Progress"
+              >
+                <PlayCircle className="h-3 w-3" />
+                <span>{taskStats.inprogress_count}</span>
+              </div>
+            )}
+            {taskStats.inreview_count > 0 && (
+              <div
+                className="flex items-center gap-1 text-purple-500"
+                title="In Review"
+              >
+                <Eye className="h-3 w-3" />
+                <span>{taskStats.inreview_count}</span>
+              </div>
+            )}
+            {taskStats.done_count > 0 && (
+              <div
+                className="flex items-center gap-1 text-green-500"
+                title="Done"
+              >
+                <CheckCircle2 className="h-3 w-3" />
+                <span>{taskStats.done_count}</span>
+              </div>
+            )}
+            {taskStats.cancelled_count > 0 && (
+              <div
+                className="flex items-center gap-1 text-red-400"
+                title="Cancelled"
+              >
+                <XCircle className="h-3 w-3" />
+                <span>{taskStats.cancelled_count}</span>
+              </div>
+            )}
+          </div>
+        </CardContent>
+      )}
     </Card>
   );
 }

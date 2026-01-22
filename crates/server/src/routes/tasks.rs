@@ -15,7 +15,7 @@ use axum::{
 use db::models::{
     image::TaskImage,
     repo::{Repo, RepoError},
-    task::{CreateTask, Task, TaskWithAttemptStatus, UpdateTask},
+    task::{CreateTask, ProjectTaskStats, Task, TaskWithAttemptStatus, UpdateTask},
     workspace::{CreateWorkspace, Workspace},
     workspace_repo::{CreateWorkspaceRepo, WorkspaceRepo},
 };
@@ -48,6 +48,13 @@ pub async fn get_tasks(
             .await?;
 
     Ok(ResponseJson(ApiResponse::success(tasks)))
+}
+
+pub async fn get_all_projects_task_stats(
+    State(deployment): State<DeploymentImpl>,
+) -> Result<ResponseJson<ApiResponse<Vec<ProjectTaskStats>>>, ApiError> {
+    let stats = Task::get_all_projects_stats(&deployment.db().pool).await?;
+    Ok(ResponseJson(ApiResponse::success(stats)))
 }
 
 pub async fn stream_tasks_ws(
@@ -403,6 +410,7 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route("/", get(get_tasks).post(create_task))
         .route("/stream/ws", get(stream_tasks_ws))
         .route("/create-and-start", post(create_task_and_start))
+        .route("/stats/all-projects", get(get_all_projects_task_stats))
         .nest("/{task_id}", task_id_router);
 
     // mount under /projects/:project_id/tasks
