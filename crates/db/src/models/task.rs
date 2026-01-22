@@ -144,17 +144,6 @@ pub struct ProjectTaskStats {
     pub running_count: i64,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize, TS)]
-pub struct ProjectTaskStats {
-    pub project_id: Uuid,
-    pub todo_count: i64,
-    pub inprogress_count: i64,
-    pub inreview_count: i64,
-    pub done_count: i64,
-    pub cancelled_count: i64,
-    pub running_count: i64,
-}
-
 impl Task {
     pub fn to_prompt(&self) -> String {
         if let Some(description) = self.description.as_ref().filter(|d| !d.trim().is_empty()) {
@@ -359,12 +348,12 @@ ORDER BY t.created_at DESC"#,
     }
 
     /// Set a task as epic
-    pub async fn set_epic(
-        pool: &SqlitePool,
-        id: Uuid,
-        is_epic: bool,
-    ) -> Result<(), sqlx::Error> {
-        let complexity = if is_epic { Some(TaskComplexity::Epic) } else { None };
+    pub async fn set_epic(pool: &SqlitePool, id: Uuid, is_epic: bool) -> Result<(), sqlx::Error> {
+        let complexity = if is_epic {
+            Some(TaskComplexity::Epic)
+        } else {
+            None
+        };
         sqlx::query!(
             "UPDATE tasks SET is_epic = $2, complexity = $3, updated_at = CURRENT_TIMESTAMP WHERE id = $1",
             id,

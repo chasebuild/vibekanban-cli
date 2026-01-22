@@ -123,6 +123,38 @@ const makeRequest = async (url: string, options: RequestInit = {}) => {
   });
 };
 
+// Generic API client for direct endpoint access
+export const api = {
+  get: async <T>(url: string): Promise<{ data: T }> => {
+    const response = await makeRequest(`/api${url}`);
+    const data = await handleApiResponse<T>(response);
+    return { data };
+  },
+  post: async <T>(url: string, body?: unknown): Promise<{ data: T }> => {
+    const response = await makeRequest(`/api${url}`, {
+      method: 'POST',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await handleApiResponse<T>(response);
+    return { data };
+  },
+  put: async <T>(url: string, body?: unknown): Promise<{ data: T }> => {
+    const response = await makeRequest(`/api${url}`, {
+      method: 'PUT',
+      body: body ? JSON.stringify(body) : undefined,
+    });
+    const data = await handleApiResponse<T>(response);
+    return { data };
+  },
+  delete: async <T>(url: string): Promise<{ data: T }> => {
+    const response = await makeRequest(`/api${url}`, {
+      method: 'DELETE',
+    });
+    const data = await handleApiResponse<T>(response);
+    return { data };
+  },
+};
+
 export type Ok<T> = { success: true; data: T };
 export type Err<E> = { success: false; error: E | undefined; message?: string };
 

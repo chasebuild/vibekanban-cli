@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE swarm_executions \n               SET consensus_approvals = consensus_approvals + 1, updated_at = datetime('now', 'subsec') \n               WHERE id = $1\n               RETURNING consensus_approvals AS \"count!: i32\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i32",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "6c9808eb230febe6a8de246d173fd6e4c3796a6ff2d5a6748035c692027c12de"
+}

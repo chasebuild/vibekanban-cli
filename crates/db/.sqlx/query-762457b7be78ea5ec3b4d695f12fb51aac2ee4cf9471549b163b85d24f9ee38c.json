@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "DELETE FROM agent_profile_skills WHERE agent_profile_id = $1 AND agent_skill_id = $2",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "762457b7be78ea5ec3b4d695f12fb51aac2ee4cf9471549b163b85d24f9ee38c"
+}

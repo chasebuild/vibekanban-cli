@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO agent_profile_skills (agent_profile_id, agent_skill_id, proficiency)\n                     VALUES ($1, $2, $3)",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "f22b68d8a36576dc61954aaa70759310e304588b2c3df34425b40b61a8d2078a"
+}

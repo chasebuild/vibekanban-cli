@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE consensus_reviews SET session_id = $2, review_diff_hash = $3, started_at = datetime('now', 'subsec'), updated_at = datetime('now', 'subsec') WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "44810bfbaeb92e18463c22ed6ebc9bcda41f4c35acab475864b5ae81ed47418c"
+}

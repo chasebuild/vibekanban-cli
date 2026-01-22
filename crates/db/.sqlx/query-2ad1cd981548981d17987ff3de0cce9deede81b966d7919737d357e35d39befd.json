@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE swarm_executions SET status = $2, completed_at = $3, updated_at = $3 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "2ad1cd981548981d17987ff3de0cce9deede81b966d7919737d357e35d39befd"
+}

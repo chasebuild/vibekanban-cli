@@ -10,7 +10,7 @@ import {
   AgentSkill,
   AgentProfile,
   Task,
-} from '../../shared/types';
+} from 'shared/types';
 
 interface SwarmExecutionResponse {
   execution: SwarmExecution;

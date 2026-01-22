@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT \n                s.id AS \"id!: Uuid\",\n                s.name,\n                s.description,\n                s.prompt_modifier,\n                s.category,\n                s.icon,\n                s.created_at AS \"created_at!: DateTime<Utc>\",\n                s.updated_at AS \"updated_at!: DateTime<Utc>\"\n            FROM agent_skills s\n            INNER JOIN agent_profile_skills aps ON s.id = aps.agent_skill_id\n            WHERE aps.agent_profile_id = $1\n            ORDER BY aps.proficiency DESC, s.name",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "description",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "prompt_modifier",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "category",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "icon",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "3e6e7e886609616388c605e8ef517fec1818bcb313b709b9f9d012c489599ac7"
+}

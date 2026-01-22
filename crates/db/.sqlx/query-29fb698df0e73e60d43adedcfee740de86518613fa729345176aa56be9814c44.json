@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT \n                id AS \"id!: Uuid\",\n                name,\n                description,\n                prompt_modifier,\n                category,\n                icon,\n                created_at AS \"created_at!: DateTime<Utc>\",\n                updated_at AS \"updated_at!: DateTime<Utc>\"\n            FROM agent_skills\n            ORDER BY category, name",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "description",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "prompt_modifier",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "category",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "icon",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "29fb698df0e73e60d43adedcfee740de86518613fa729345176aa56be9814c44"
+}

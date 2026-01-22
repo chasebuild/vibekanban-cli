@@ -2,13 +2,12 @@ import {
   ConsensusReview,
   ConsensusSummary,
   ConsensusVote,
-} from '../../../shared/types';
+} from 'shared/types';
 import { Badge } from '../ui/badge';
 import { Progress } from '../ui/progress';
 import { Button } from '../ui/button';
 import {
   CheckCircle,
-  XCircle,
   HelpCircle,
   Clock,
   Users,

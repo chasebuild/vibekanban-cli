@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE swarm_tasks SET assigned_agent_profile_id = $2, status = 'assigned', updated_at = datetime('now', 'subsec') WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "ae183298f29846836344b33399aa741e6430e1dcee502f10a9c92fe1e0d1a47a"
+}

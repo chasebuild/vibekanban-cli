@@ -19,11 +19,13 @@ use db::models::{
     swarm_task::{SwarmProgress, SwarmTask},
     task::Task,
 };
+use deployment::Deployment;
 use serde::{Deserialize, Serialize};
+use sqlx::Error as SqlxError;
 use ts_rs::TS;
 use uuid::Uuid;
 
-use crate::{DeploymentImpl, error::AppError};
+use crate::{DeploymentImpl, error::ApiError};
 
 // ============== Request/Response Types ==============
 
@@ -115,13 +117,13 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
 async fn create_swarm_execution(
     State(deployment): State<DeploymentImpl>,
     Json(req): Json<CreateSwarmExecutionRequest>,
-) -> Result<Json<SwarmExecution>, AppError> {
-    let pool = deployment.pool();
-    
+) -> Result<Json<SwarmExecution>, ApiError> {
+    let pool = &deployment.db().pool;
+
     // Verify task exists and is epic
     let task = Task::find_by_id(pool, req.epic_task_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Task not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     if !task.is_epic {
         // Auto-set as epic
@@ -132,7 +134,7 @@ async fn create_swarm_execution(
     let execution = planner
         .create_swarm_execution(req.epic_task_id, req.workspace_id)
         .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     Ok(Json(execution))
 }
@@ -140,12 +142,12 @@ async fn create_swarm_execution(
 async fn get_swarm_execution(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<SwarmExecutionResponse>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<SwarmExecutionResponse>, ApiError> {
+    let pool = &deployment.db().pool;
 
     let execution = SwarmExecution::find_by_id(pool, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Swarm execution not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     let tasks = SwarmTask::find_by_swarm_execution(pool, id).await?;
     let progress = SwarmTask::get_progress(pool, id).await?;
@@ -160,18 +162,18 @@ async fn get_swarm_execution(
 async fn generate_plan(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<SwarmPlanResponse>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<SwarmPlanResponse>, ApiError> {
+    let pool = &deployment.db().pool;
     let planner = services::services::swarm::PlannerService::new(pool.clone());
 
     let plan = planner
         .generate_plan(id)
         .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     let execution = SwarmExecution::find_by_id(pool, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Swarm execution not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     Ok(Json(SwarmPlanResponse { execution, plan }))
 }
@@ -179,26 +181,24 @@ async fn generate_plan(
 async fn execute_plan(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<Vec<SwarmTask>>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<Vec<SwarmTask>>, ApiError> {
+    let pool = &deployment.db().pool;
 
     let execution = SwarmExecution::find_by_id(pool, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Swarm execution not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     let plan: SwarmPlanOutput = execution
         .planner_output
         .as_ref()
-        .ok_or_else(|| AppError::BadRequest("No plan generated yet".into()))
-        .and_then(|p| {
-            serde_json::from_str(p).map_err(|e| AppError::BadRequest(e.to_string()))
-        })?;
+        .ok_or_else(|| ApiError::BadRequest("No plan generated yet".into()))
+        .and_then(|p| serde_json::from_str(p).map_err(|e| ApiError::BadRequest(e.to_string())))?;
 
     let planner = services::services::swarm::PlannerService::new(pool.clone());
     let tasks = planner
         .execute_plan(id, &plan)
         .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     Ok(Json(tasks))
 }
@@ -206,8 +206,8 @@ async fn execute_plan(
 async fn get_progress(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<SwarmProgress>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<SwarmProgress>, ApiError> {
+    let pool = &deployment.db().pool;
     let progress = SwarmTask::get_progress(pool, id).await?;
     Ok(Json(progress))
 }
@@ -215,18 +215,18 @@ async fn get_progress(
 async fn pause_execution(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<SwarmExecution>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<SwarmExecution>, ApiError> {
+    let pool = &deployment.db().pool;
     let manager = services::services::swarm::SwarmManager::new(pool.clone());
 
     manager
         .pause_execution(id)
         .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     let execution = SwarmExecution::find_by_id(pool, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Swarm execution not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     Ok(Json(execution))
 }
@@ -234,18 +234,18 @@ async fn pause_execution(
 async fn resume_execution(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<SwarmExecution>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<SwarmExecution>, ApiError> {
+    let pool = &deployment.db().pool;
     let manager = services::services::swarm::SwarmManager::new(pool.clone());
 
     manager
         .resume_execution(id)
         .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     let execution = SwarmExecution::find_by_id(pool, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Swarm execution not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     Ok(Json(execution))
 }
@@ -253,18 +253,18 @@ async fn resume_execution(
 async fn cancel_execution(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<SwarmExecution>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<SwarmExecution>, ApiError> {
+    let pool = &deployment.db().pool;
     let manager = services::services::swarm::SwarmManager::new(pool.clone());
 
     manager
         .cancel_execution(id)
         .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     let execution = SwarmExecution::find_by_id(pool, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Swarm execution not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     Ok(Json(execution))
 }
@@ -274,8 +274,8 @@ async fn cancel_execution(
 async fn get_swarm_tasks(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<Vec<SwarmTask>>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<Vec<SwarmTask>>, ApiError> {
+    let pool = &deployment.db().pool;
     let tasks = SwarmTask::find_by_swarm_execution(pool, id).await?;
     Ok(Json(tasks))
 }
@@ -283,18 +283,18 @@ async fn get_swarm_tasks(
 async fn complete_task(
     State(deployment): State<DeploymentImpl>,
     Path(task_id): Path<Uuid>,
-) -> Result<Json<SwarmTask>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<SwarmTask>, ApiError> {
+    let pool = &deployment.db().pool;
     let manager = services::services::swarm::SwarmManager::new(pool.clone());
 
     manager
         .complete_task(task_id)
         .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     let task = SwarmTask::find_by_id(pool, task_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Swarm task not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     Ok(Json(task))
 }
@@ -308,18 +308,18 @@ async fn fail_task(
     State(deployment): State<DeploymentImpl>,
     Path(task_id): Path<Uuid>,
     Json(req): Json<FailTaskRequest>,
-) -> Result<Json<SwarmTask>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<SwarmTask>, ApiError> {
+    let pool = &deployment.db().pool;
     let manager = services::services::swarm::SwarmManager::new(pool.clone());
 
     manager
         .fail_task(task_id, &req.error)
         .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     let task = SwarmTask::find_by_id(pool, task_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Swarm task not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     Ok(Json(task))
 }
@@ -329,23 +329,23 @@ async fn fail_task(
 async fn get_consensus_status(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<ConsensusStatusResponse>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<ConsensusStatusResponse>, ApiError> {
+    let pool = &deployment.db().pool;
     let consensus = services::services::swarm::ConsensusService::new(pool.clone());
 
     let execution = SwarmExecution::find_by_id(pool, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Swarm execution not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     let reviews = consensus
         .get_reviews(id)
         .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     let summary = consensus
         .get_summary(id)
         .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     Ok(Json(ConsensusStatusResponse {
         execution,
@@ -357,14 +357,14 @@ async fn get_consensus_status(
 async fn start_consensus(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<Vec<ConsensusReview>>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<Vec<ConsensusReview>>, ApiError> {
+    let pool = &deployment.db().pool;
     let consensus = services::services::swarm::ConsensusService::new(pool.clone());
 
     let reviews = consensus
         .start_review(id)
         .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     Ok(Json(reviews))
 }
@@ -373,14 +373,14 @@ async fn submit_vote(
     State(deployment): State<DeploymentImpl>,
     Path(_id): Path<Uuid>,
     Json(req): Json<SubmitVoteRequest>,
-) -> Result<Json<ConsensusReview>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<ConsensusReview>, ApiError> {
+    let pool = &deployment.db().pool;
     let consensus = services::services::swarm::ConsensusService::new(pool.clone());
 
     let review = consensus
         .submit_vote(req.review_id, &req.vote)
         .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     Ok(Json(review))
 }
@@ -388,18 +388,18 @@ async fn submit_vote(
 async fn finalize_consensus(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<SwarmExecution>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<SwarmExecution>, ApiError> {
+    let pool = &deployment.db().pool;
     let consensus = services::services::swarm::ConsensusService::new(pool.clone());
 
     consensus
         .finalize_consensus(id)
         .await
-        .map_err(|e| AppError::BadRequest(e.to_string()))?;
+        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     let execution = SwarmExecution::find_by_id(pool, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Swarm execution not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     Ok(Json(execution))
 }
@@ -408,8 +408,8 @@ async fn finalize_consensus(
 
 async fn list_skills(
     State(deployment): State<DeploymentImpl>,
-) -> Result<Json<Vec<AgentSkill>>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<Vec<AgentSkill>>, ApiError> {
+    let pool = &deployment.db().pool;
     let skills = AgentSkill::find_all(pool).await?;
     Ok(Json(skills))
 }
@@ -417,19 +417,19 @@ async fn list_skills(
 async fn get_skill(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<AgentSkill>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<AgentSkill>, ApiError> {
+    let pool = &deployment.db().pool;
     let skill = AgentSkill::find_by_id(pool, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Skill not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
     Ok(Json(skill))
 }
 
 async fn create_skill(
     State(deployment): State<DeploymentImpl>,
     Json(req): Json<CreateAgentSkill>,
-) -> Result<Json<AgentSkill>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<AgentSkill>, ApiError> {
+    let pool = &deployment.db().pool;
     let skill = AgentSkill::create(pool, &req).await?;
     Ok(Json(skill))
 }
@@ -438,8 +438,8 @@ async fn update_skill(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateAgentSkill>,
-) -> Result<Json<AgentSkill>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<AgentSkill>, ApiError> {
+    let pool = &deployment.db().pool;
     let skill = AgentSkill::update(pool, id, &req).await?;
     Ok(Json(skill))
 }
@@ -447,8 +447,8 @@ async fn update_skill(
 async fn delete_skill(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<bool>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<bool>, ApiError> {
+    let pool = &deployment.db().pool;
     AgentSkill::delete(pool, id).await?;
     Ok(Json(true))
 }
@@ -457,8 +457,8 @@ async fn delete_skill(
 
 async fn list_profiles(
     State(deployment): State<DeploymentImpl>,
-) -> Result<Json<Vec<AgentProfile>>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<Vec<AgentProfile>>, ApiError> {
+    let pool = &deployment.db().pool;
     let profiles = AgentProfile::find_all(pool).await?;
     Ok(Json(profiles))
 }
@@ -466,19 +466,19 @@ async fn list_profiles(
 async fn get_profile(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<AgentProfile>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<AgentProfile>, ApiError> {
+    let pool = &deployment.db().pool;
     let profile = AgentProfile::find_by_id(pool, id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Profile not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
     Ok(Json(profile))
 }
 
 async fn create_profile(
     State(deployment): State<DeploymentImpl>,
     Json(req): Json<CreateAgentProfile>,
-) -> Result<Json<AgentProfile>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<AgentProfile>, ApiError> {
+    let pool = &deployment.db().pool;
     let profile = AgentProfile::create(pool, &req).await?;
     Ok(Json(profile))
 }
@@ -487,8 +487,8 @@ async fn update_profile(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
     Json(req): Json<UpdateAgentProfile>,
-) -> Result<Json<AgentProfile>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<AgentProfile>, ApiError> {
+    let pool = &deployment.db().pool;
     let profile = AgentProfile::update(pool, id, &req).await?;
     Ok(Json(profile))
 }
@@ -496,8 +496,8 @@ async fn update_profile(
 async fn delete_profile(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<bool>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<bool>, ApiError> {
+    let pool = &deployment.db().pool;
     AgentProfile::delete(pool, id).await?;
     Ok(Json(true))
 }
@@ -505,8 +505,8 @@ async fn delete_profile(
 async fn get_profile_skills(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<Vec<AgentSkill>>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<Vec<AgentSkill>>, ApiError> {
+    let pool = &deployment.db().pool;
     let skills = AgentProfile::get_skills(pool, id).await?;
     Ok(Json(skills))
 }
@@ -520,8 +520,8 @@ async fn add_profile_skill(
     State(deployment): State<DeploymentImpl>,
     Path((id, skill_id)): Path<(Uuid, Uuid)>,
     Json(req): Json<AddSkillRequest>,
-) -> Result<Json<bool>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<bool>, ApiError> {
+    let pool = &deployment.db().pool;
     let proficiency = req.proficiency.unwrap_or(3);
     AgentProfile::add_skill(pool, id, skill_id, proficiency).await?;
     Ok(Json(true))
@@ -530,8 +530,8 @@ async fn add_profile_skill(
 async fn remove_profile_skill(
     State(deployment): State<DeploymentImpl>,
     Path((id, skill_id)): Path<(Uuid, Uuid)>,
-) -> Result<Json<bool>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<bool>, ApiError> {
+    let pool = &deployment.db().pool;
     AgentProfile::remove_skill(pool, id, skill_id).await?;
     Ok(Json(true))
 }
@@ -541,8 +541,8 @@ async fn remove_profile_skill(
 async fn list_epic_tasks(
     State(deployment): State<DeploymentImpl>,
     Path(project_id): Path<Uuid>,
-) -> Result<Json<Vec<Task>>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<Vec<Task>>, ApiError> {
+    let pool = &deployment.db().pool;
     let tasks = Task::find_epic_tasks(pool, project_id).await?;
     Ok(Json(tasks))
 }
@@ -556,13 +556,13 @@ async fn set_task_epic(
     State(deployment): State<DeploymentImpl>,
     Path(task_id): Path<Uuid>,
     Json(req): Json<SetEpicRequest>,
-) -> Result<Json<Task>, AppError> {
-    let pool = deployment.pool();
+) -> Result<Json<Task>, ApiError> {
+    let pool = &deployment.db().pool;
     Task::set_epic(pool, task_id, req.is_epic).await?;
-    
+
     let task = Task::find_by_id(pool, task_id)
         .await?
-        .ok_or_else(|| AppError::NotFound("Task not found".into()))?;
+        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     Ok(Json(task))
 }

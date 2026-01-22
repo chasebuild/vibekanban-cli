@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE swarm_executions SET error_message = $2, status = 'failed', completed_at = datetime('now', 'subsec'), updated_at = datetime('now', 'subsec') WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "dd871df7fdcbeca60e61d4adadffa1c24d807bcfe3e71b4ca5ac1c2a875177a8"
+}

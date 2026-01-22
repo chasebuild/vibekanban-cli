@@ -1,37 +1,37 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT id as \"id!: Uuid\", project_id as \"project_id!: Uuid\", title, description, status as \"status!: TaskStatus\", parent_workspace_id as \"parent_workspace_id: Uuid\", created_at as \"created_at!: DateTime<Utc>\", updated_at as \"updated_at!: DateTime<Utc>\"\n               FROM tasks\n               WHERE rowid = $1",
+  "query": "SELECT \n                id AS \"id!: Uuid\",\n                name,\n                description,\n                prompt_modifier,\n                category,\n                icon,\n                created_at AS \"created_at!: DateTime<Utc>\",\n                updated_at AS \"updated_at!: DateTime<Utc>\"\n            FROM agent_skills\n            WHERE name = $1",
   "describe": {
     "columns": [
       {
         "name": "id!: Uuid",
         "ordinal": 0,
-        "type_info": "Blob"
+        "type_info": "Text"
       },
       {
-        "name": "project_id!: Uuid",
+        "name": "name",
         "ordinal": 1,
-        "type_info": "Blob"
-      },
-      {
-        "name": "title",
-        "ordinal": 2,
         "type_info": "Text"
       },
       {
         "name": "description",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "prompt_modifier",
         "ordinal": 3,
         "type_info": "Text"
       },
       {
-        "name": "status!: TaskStatus",
+        "name": "category",
         "ordinal": 4,
         "type_info": "Text"
       },
       {
-        "name": "parent_workspace_id: Uuid",
+        "name": "icon",
         "ordinal": 5,
-        "type_info": "Blob"
+        "type_info": "Text"
       },
       {
         "name": "created_at!: DateTime<Utc>",
@@ -48,7 +48,7 @@
       "Right": 1
     },
     "nullable": [
-      true,
+      false,
       false,
       false,
       true,
@@ -58,5 +58,5 @@
       false
     ]
   },
-  "hash": "ec538c142a4daa4ba6ae91fa77a441b0b3a730fd1f6be39e811a7fd7fa3c7eb9"
+  "hash": "2ae8f03cff44ad9c3c68097767e06b26dab16d598db27ae843a2d3cd8072668c"
 }

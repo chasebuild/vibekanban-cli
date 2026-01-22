@@ -183,12 +183,13 @@ impl PlannerService {
 
     /// Decompose a task into subtasks
     async fn decompose_task(&self, task: &Task) -> Result<SwarmPlanOutput, PlannerError> {
-        let complexity = self.analyze_complexity(task);
+        let complexity = self.analyze_complexity(task).await;
         
         // Simple rule-based decomposition for demonstration
         // In production, this would be done by the planner agent
         let subtasks = self.generate_subtasks(task, &complexity);
-        let requires_swarm = subtasks.len() >= self.config.swarm_threshold as usize;
+        let subtasks_count = subtasks.len();
+        let requires_swarm = subtasks_count >= self.config.swarm_threshold as usize;
 
         Ok(SwarmPlanOutput {
             complexity: format!("{:?}", complexity),
@@ -199,7 +200,7 @@ impl PlannerService {
                 "Task '{}' analyzed as {:?} complexity. {} subtasks identified.",
                 task.title,
                 complexity,
-                subtasks.len()
+                subtasks_count
             ),
         })
     }

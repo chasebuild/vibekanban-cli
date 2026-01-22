@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE swarm_tasks SET \n                status = 'completed', \n                completed_at = datetime('now', 'subsec'),\n                duration_seconds = CAST((julianday(datetime('now', 'subsec')) - julianday(started_at)) * 86400 AS INTEGER),\n                updated_at = datetime('now', 'subsec') \n            WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "283bf5e62c280fea879bcca65612c8669cb4c59f7b15dcb64413af527054b761"
+}

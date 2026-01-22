@@ -1,0 +1,62 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE agent_skills SET\n                name = COALESCE($2, name),\n                description = COALESCE($3, description),\n                prompt_modifier = COALESCE($4, prompt_modifier),\n                category = COALESCE($5, category),\n                icon = COALESCE($6, icon),\n                updated_at = datetime('now', 'subsec')\n            WHERE id = $1\n            RETURNING \n                id AS \"id!: Uuid\",\n                name,\n                description,\n                prompt_modifier,\n                category,\n                icon,\n                created_at AS \"created_at!: DateTime<Utc>\",\n                updated_at AS \"updated_at!: DateTime<Utc>\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "description",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "prompt_modifier",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "category",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "icon",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 7,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 6
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "6de70f928c0395d733cd09f94a63857ef77d71845dbf4b24b3091bb7ba337d60"
+}

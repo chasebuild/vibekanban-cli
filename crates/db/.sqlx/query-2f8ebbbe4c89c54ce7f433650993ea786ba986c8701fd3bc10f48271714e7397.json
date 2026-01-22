@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COUNT(*) AS \"count!: i64\" FROM swarm_tasks \n               WHERE swarm_execution_id = $1 AND status NOT IN ('completed', 'skipped')",
+  "describe": {
+    "columns": [
+      {
+        "name": "count!: i64",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "2f8ebbbe4c89c54ce7f433650993ea786ba986c8701fd3bc10f48271714e7397"
+}

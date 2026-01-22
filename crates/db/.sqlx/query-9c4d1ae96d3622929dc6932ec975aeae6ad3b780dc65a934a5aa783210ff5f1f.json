@@ -1,0 +1,128 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT \n                id AS \"id!: Uuid\",\n                swarm_execution_id AS \"swarm_execution_id!: Uuid\",\n                task_id AS \"task_id!: Uuid\",\n                workspace_id AS \"workspace_id: Uuid\",\n                sequence_order AS \"sequence_order!: i32\",\n                depends_on,\n                required_skills,\n                assigned_agent_profile_id AS \"assigned_agent_profile_id: Uuid\",\n                status AS \"status!: SwarmTaskStatus\",\n                branch_name,\n                complexity AS \"complexity!: i32\",\n                duration_seconds AS \"duration_seconds: i32\",\n                error_message,\n                retry_count AS \"retry_count!: i32\",\n                max_retries AS \"max_retries!: i32\",\n                started_at AS \"started_at: DateTime<Utc>\",\n                completed_at AS \"completed_at: DateTime<Utc>\",\n                created_at AS \"created_at!: DateTime<Utc>\",\n                updated_at AS \"updated_at!: DateTime<Utc>\"\n            FROM swarm_tasks\n            WHERE swarm_execution_id = $1\n            ORDER BY sequence_order",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "swarm_execution_id!: Uuid",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "task_id!: Uuid",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "workspace_id: Uuid",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "sequence_order!: i32",
+        "ordinal": 4,
+        "type_info": "Integer"
+      },
+      {
+        "name": "depends_on",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "required_skills",
+        "ordinal": 6,
+        "type_info": "Text"
+      },
+      {
+        "name": "assigned_agent_profile_id: Uuid",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "status!: SwarmTaskStatus",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "branch_name",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "complexity!: i32",
+        "ordinal": 10,
+        "type_info": "Integer"
+      },
+      {
+        "name": "duration_seconds: i32",
+        "ordinal": 11,
+        "type_info": "Integer"
+      },
+      {
+        "name": "error_message",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "retry_count!: i32",
+        "ordinal": 13,
+        "type_info": "Integer"
+      },
+      {
+        "name": "max_retries!: i32",
+        "ordinal": 14,
+        "type_info": "Integer"
+      },
+      {
+        "name": "started_at: DateTime<Utc>",
+        "ordinal": 15,
+        "type_info": "Text"
+      },
+      {
+        "name": "completed_at: DateTime<Utc>",
+        "ordinal": 16,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 17,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 18,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      true,
+      true,
+      false,
+      false
+    ]
+  },
+  "hash": "9c4d1ae96d3622929dc6932ec975aeae6ad3b780dc65a934a5aa783210ff5f1f"
+}

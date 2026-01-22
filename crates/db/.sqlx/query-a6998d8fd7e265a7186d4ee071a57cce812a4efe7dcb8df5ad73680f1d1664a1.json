@@ -1,0 +1,20 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT COALESCE(MAX(round), 0) AS \"round!: i32\" FROM consensus_reviews WHERE swarm_execution_id = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "round!: i32",
+        "ordinal": 0,
+        "type_info": "Integer"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false
+    ]
+  },
+  "hash": "a6998d8fd7e265a7186d4ee071a57cce812a4efe7dcb8df5ad73680f1d1664a1"
+}

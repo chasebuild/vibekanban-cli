@@ -1,0 +1,128 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT \n                id AS \"id!: Uuid\",\n                epic_task_id AS \"epic_task_id!: Uuid\",\n                epic_workspace_id AS \"epic_workspace_id: Uuid\",\n                status AS \"status!: SwarmExecutionStatus\",\n                planner_output,\n                planner_profile_id AS \"planner_profile_id: Uuid\",\n                reviewer_count AS \"reviewer_count!: i32\",\n                consensus_threshold AS \"consensus_threshold!: i32\",\n                consensus_approvals AS \"consensus_approvals!: i32\",\n                consensus_rejections AS \"consensus_rejections!: i32\",\n                max_parallel_workers AS \"max_parallel_workers!: i32\",\n                error_message,\n                planned_at AS \"planned_at: DateTime<Utc>\",\n                execution_started_at AS \"execution_started_at: DateTime<Utc>\",\n                review_started_at AS \"review_started_at: DateTime<Utc>\",\n                merge_started_at AS \"merge_started_at: DateTime<Utc>\",\n                created_at AS \"created_at!: DateTime<Utc>\",\n                completed_at AS \"completed_at: DateTime<Utc>\",\n                updated_at AS \"updated_at!: DateTime<Utc>\"\n            FROM swarm_executions\n            WHERE status IN ('planning', 'planned', 'executing', 'reviewing', 'merging')\n            ORDER BY created_at DESC",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "epic_task_id!: Uuid",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "epic_workspace_id: Uuid",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "status!: SwarmExecutionStatus",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "planner_output",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "planner_profile_id: Uuid",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "reviewer_count!: i32",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "consensus_threshold!: i32",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "consensus_approvals!: i32",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "consensus_rejections!: i32",
+        "ordinal": 9,
+        "type_info": "Integer"
+      },
+      {
+        "name": "max_parallel_workers!: i32",
+        "ordinal": 10,
+        "type_info": "Integer"
+      },
+      {
+        "name": "error_message",
+        "ordinal": 11,
+        "type_info": "Text"
+      },
+      {
+        "name": "planned_at: DateTime<Utc>",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "execution_started_at: DateTime<Utc>",
+        "ordinal": 13,
+        "type_info": "Text"
+      },
+      {
+        "name": "review_started_at: DateTime<Utc>",
+        "ordinal": 14,
+        "type_info": "Text"
+      },
+      {
+        "name": "merge_started_at: DateTime<Utc>",
+        "ordinal": 15,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 16,
+        "type_info": "Text"
+      },
+      {
+        "name": "completed_at: DateTime<Utc>",
+        "ordinal": 17,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 18,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      true,
+      true,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "ed5915fad1952faf53a1e8ed9ee285768324ee41c85ab0324e3d1ea7ac227242"
+}

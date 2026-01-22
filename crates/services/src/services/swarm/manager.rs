@@ -5,7 +5,6 @@
 
 use db::models::{
     agent_profile::AgentProfile,
-    agent_skill::AgentSkill,
     swarm_execution::{SwarmExecution, SwarmExecutionStatus},
     swarm_task::{SwarmProgress, SwarmTask, SwarmTaskStatus},
     task::{Task, TaskStatus},
@@ -13,7 +12,6 @@ use db::models::{
 };
 use serde::{Deserialize, Serialize};
 use sqlx::SqlitePool;
-use std::collections::HashMap;
 use thiserror::Error;
 use tokio::sync::mpsc;
 use uuid::Uuid;
@@ -37,13 +35,30 @@ pub enum SwarmError {
 /// Event types for swarm execution
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum SwarmEvent {
-    TaskStarted { swarm_task_id: Uuid, agent_id: Uuid },
-    TaskCompleted { swarm_task_id: Uuid },
-    TaskFailed { swarm_task_id: Uuid, error: String },
-    ExecutionProgress { progress: SwarmProgress },
-    ExecutionCompleted { swarm_execution_id: Uuid },
-    ExecutionFailed { swarm_execution_id: Uuid, error: String },
-    ConsensusRequired { swarm_execution_id: Uuid },
+    TaskStarted {
+        swarm_task_id: Uuid,
+        agent_id: Uuid,
+    },
+    TaskCompleted {
+        swarm_task_id: Uuid,
+    },
+    TaskFailed {
+        swarm_task_id: Uuid,
+        error: String,
+    },
+    ExecutionProgress {
+        progress: SwarmProgress,
+    },
+    ExecutionCompleted {
+        swarm_execution_id: Uuid,
+    },
+    ExecutionFailed {
+        swarm_execution_id: Uuid,
+        error: String,
+    },
+    ConsensusRequired {
+        swarm_execution_id: Uuid,
+    },
 }
 
 /// Configuration for the swarm manager
@@ -176,7 +191,7 @@ impl SwarmManager {
                 SwarmExecutionStatus::Reviewing,
             )
             .await?;
-            
+
             self.emit_event(SwarmEvent::ConsensusRequired { swarm_execution_id })
                 .await;
         }
@@ -219,7 +234,7 @@ impl SwarmManager {
             task.id,
         )
         .await
-        .map_err(|e| SwarmError::Database(e.into()))?;
+        .map_err(|e| SwarmError::ExecutionFailed(e.to_string()))?;
 
         // Update swarm task with workspace info
         SwarmTask::set_workspace(&self.pool, swarm_task.id, workspace.id, &branch_name).await?;
@@ -329,7 +344,7 @@ impl SwarmManager {
 
         // Check if execution should fail
         let progress = SwarmTask::get_progress(&self.pool, swarm_task.swarm_execution_id).await?;
-        
+
         // If more than half failed, fail the execution
         if progress.failed > progress.total / 2 {
             SwarmExecution::set_error(
@@ -382,8 +397,12 @@ impl SwarmManager {
         }
 
         // Note: In a full implementation, this would also signal running agents to pause
-        SwarmExecution::update_status(&self.pool, swarm_execution_id, SwarmExecutionStatus::Planned)
-            .await?;
+        SwarmExecution::update_status(
+            &self.pool,
+            swarm_execution_id,
+            SwarmExecutionStatus::Planned,
+        )
+        .await?;
 
         Ok(())
     }
@@ -417,7 +436,7 @@ impl SwarmManager {
     pub async fn cancel_execution(&self, swarm_execution_id: Uuid) -> Result<(), SwarmError> {
         // Mark all pending tasks as skipped
         let tasks = SwarmTask::find_by_swarm_execution(&self.pool, swarm_execution_id).await?;
-        
+
         for task in tasks {
             if task.status == SwarmTaskStatus::Pending || task.status == SwarmTaskStatus::Blocked {
                 SwarmTask::skip(&self.pool, task.id).await?;

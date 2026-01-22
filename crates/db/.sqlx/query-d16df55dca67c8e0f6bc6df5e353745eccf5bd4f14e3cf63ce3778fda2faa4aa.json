@@ -1,0 +1,98 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT \n                id AS \"id!: Uuid\",\n                name,\n                description,\n                executor,\n                variant,\n                executor_config,\n                is_planner AS \"is_planner!: bool\",\n                is_reviewer AS \"is_reviewer!: bool\",\n                is_worker AS \"is_worker!: bool\",\n                max_concurrent_tasks AS \"max_concurrent_tasks!: i32\",\n                priority AS \"priority!: i32\",\n                active AS \"active!: bool\",\n                created_at AS \"created_at!: DateTime<Utc>\",\n                updated_at AS \"updated_at!: DateTime<Utc>\"\n            FROM agent_profiles\n            WHERE active = 1\n            ORDER BY priority DESC, name",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "name",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "description",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "executor",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "variant",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "executor_config",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "is_planner!: bool",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "is_reviewer!: bool",
+        "ordinal": 7,
+        "type_info": "Integer"
+      },
+      {
+        "name": "is_worker!: bool",
+        "ordinal": 8,
+        "type_info": "Integer"
+      },
+      {
+        "name": "max_concurrent_tasks!: i32",
+        "ordinal": 9,
+        "type_info": "Integer"
+      },
+      {
+        "name": "priority!: i32",
+        "ordinal": 10,
+        "type_info": "Integer"
+      },
+      {
+        "name": "active!: bool",
+        "ordinal": 11,
+        "type_info": "Integer"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 12,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 13,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 0
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false,
+      false
+    ]
+  },
+  "hash": "d16df55dca67c8e0f6bc6df5e353745eccf5bd4f14e3cf63ce3778fda2faa4aa"
+}
