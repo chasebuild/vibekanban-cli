@@ -1,0 +1,800 @@
+import { useState, useCallback, useMemo, useRef, useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
+import { useDropzone } from 'react-dropzone';
+import {
+  Send,
+  Loader2,
+  Plus,
+  X,
+  GitBranch,
+  ChevronDown,
+  ChevronUp,
+  Check,
+  Search,
+  Image as ImageIcon,
+  Paperclip,
+  MessageSquarePlus,
+} from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { AutoExpandingTextarea } from '@/components/ui/auto-expanding-textarea';
+import { Switch } from '@/components/ui/switch';
+import { Label } from '@/components/ui/label';
+import { ExecutorProfileSelector } from '@/components/settings';
+import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import {
+  useTaskMutations,
+  useProjectRepos,
+  useRepoBranchSelection,
+  useImageUpload,
+} from '@/hooks';
+import { useUserSystem } from '@/components/ConfigProvider';
+import { cn } from '@/lib/utils';
+import type {
+  ExecutorProfileId,
+  GitBranch as GitBranchType,
+  ImageResponse,
+} from 'shared/types';
+
+interface TaskRow {
+  id: string;
+  prompt: string;
+  branch: string | null;
+  images: ImageResponse[];
+}
+
+interface QuickTaskInputProps {
+  projectId: string;
+  className?: string;
+  /** Start collapsed (default: false) */
+  defaultCollapsed?: boolean;
+}
+
+// Creatable branch selector component
+interface BranchComboboxProps {
+  branches: GitBranchType[];
+  value: string | null;
+  onChange: (value: string) => void;
+  placeholder?: string;
+  disabled?: boolean;
+  isLoading?: boolean;
+}
+
+function BranchCombobox({
+  branches,
+  value,
+  onChange,
+  placeholder = 'Select branch...',
+  disabled,
+  isLoading,
+}: BranchComboboxProps) {
+  const { t } = useTranslation(['common']);
+  const [open, setOpen] = useState(false);
+  const [search, setSearch] = useState('');
+  const inputRef = useRef<HTMLInputElement>(null);
+
+  const filteredBranches = useMemo(() => {
+    if (!search.trim()) return branches;
+    const q = search.toLowerCase();
+    return branches.filter((b) => b.name.toLowerCase().includes(q));
+  }, [branches, search]);
+
+  // Check if search matches any existing branch
+  const exactMatch = branches.find(
+    (b) => b.name.toLowerCase() === search.trim().toLowerCase()
+  );
+  const showCreateOption = search.trim() && !exactMatch;
+
+  useEffect(() => {
+    if (open && inputRef.current) {
+      // Small delay to ensure the dropdown is rendered
+      setTimeout(() => inputRef.current?.focus(), 50);
+    }
+    if (!open) {
+      setSearch('');
+    }
+  }, [open]);
+
+  const handleSelect = useCallback(
+    (branchName: string) => {
+      onChange(branchName);
+      setOpen(false);
+      setSearch('');
+    },
+    [onChange]
+  );
+
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <Button
+          variant="outline"
+          size="sm"
+          disabled={disabled || isLoading}
+          className="w-full justify-between text-xs h-8"
+        >
+          <div className="flex items-center gap-1.5 min-w-0 flex-1">
+            <GitBranch className="h-3 w-3 flex-shrink-0" />
+            <span className="truncate">
+              {isLoading ? t('common:loading') : value || placeholder}
+            </span>
+          </div>
+          <ChevronDown className="h-3 w-3 flex-shrink-0 opacity-50" />
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent className="w-56" align="start">
+        <div className="p-2">
+          <div className="relative">
+            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
+            <Input
+              ref={inputRef}
+              placeholder={t('branchSelector.searchPlaceholder')}
+              value={search}
+              onChange={(e) => setSearch(e.target.value)}
+              onKeyDown={(e) => {
+                // Create custom branch on Enter if search doesn't match any branch
+                if (e.key === 'Enter') {
+                  e.preventDefault();
+                  if (showCreateOption) {
+                    handleSelect(search.trim());
+                  } else if (filteredBranches.length > 0) {
+                    handleSelect(filteredBranches[0].name);
+                  }
+                }
+                e.stopPropagation();
+              }}
+              className="pl-8 h-8 text-xs"
+            />
+          </div>
+        </div>
+        <DropdownMenuSeparator />
+        <div className="max-h-48 overflow-y-auto">
+          {showCreateOption && (
+            <DropdownMenuItem
+              onSelect={() => handleSelect(search.trim())}
+              className="text-xs"
+            >
+              <Plus className="h-3 w-3 mr-2" />
+              {t('branchSelector.useCustom', { branch: search.trim() })}
+            </DropdownMenuItem>
+          )}
+          {filteredBranches.length === 0 && !showCreateOption ? (
+            <div className="p-2 text-xs text-center text-muted-foreground">
+              {t('branchSelector.empty')}
+            </div>
+          ) : (
+            filteredBranches.map((branch) => (
+              <DropdownMenuItem
+                key={branch.name}
+                onSelect={() => handleSelect(branch.name)}
+                className="text-xs"
+              >
+                <Check
+                  className={cn(
+                    'mr-2 h-3 w-3',
+                    value === branch.name ? 'opacity-100' : 'opacity-0'
+                  )}
+                />
+                <span className="truncate flex-1">{branch.name}</span>
+                {branch.is_current && (
+                  <span className="text-[10px] bg-muted px-1 rounded ml-1">
+                    {t('branchSelector.badges.current')}
+                  </span>
+                )}
+              </DropdownMenuItem>
+            ))
+          )}
+        </div>
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+// Image thumbnail component
+function ImageThumbnail({
+  image,
+  onRemove,
+  disabled,
+}: {
+  image: ImageResponse;
+  onRemove: () => void;
+  disabled: boolean;
+}) {
+  return (
+    <div className="relative group w-16 h-16 rounded-md overflow-hidden border bg-muted flex-shrink-0">
+      <img
+        src={image.file_path}
+        alt={image.original_name}
+        className="w-full h-full object-cover"
+      />
+      {!disabled && (
+        <button
+          onClick={onRemove}
+          className="absolute top-0.5 right-0.5 p-0.5 rounded-full bg-black/60 text-white opacity-0 group-hover:opacity-100 transition-opacity"
+        >
+          <X className="h-3 w-3" />
+        </button>
+      )}
+    </div>
+  );
+}
+
+// Single task row component with multiline textarea and image support
+interface TaskRowInputProps {
+  row: TaskRow;
+  branches: GitBranchType[];
+  branchesLoading: boolean;
+  onChange: (
+    id: string,
+    field: 'prompt' | 'branch',
+    value: string
+  ) => void;
+  onImagesChange: (id: string, images: ImageResponse[]) => void;
+  onRemove: (id: string) => void;
+  onKeyDown: (e: React.KeyboardEvent, id: string) => void;
+  showRemove: boolean;
+  disabled: boolean;
+  autoFocus?: boolean;
+  placeholder: string;
+  upload: (file: File) => Promise<ImageResponse>;
+}
+
+function TaskRowInput({
+  row,
+  branches,
+  branchesLoading,
+  onChange,
+  onImagesChange,
+  onRemove,
+  onKeyDown,
+  showRemove,
+  disabled,
+  autoFocus,
+  placeholder,
+  upload,
+}: TaskRowInputProps) {
+  const { t } = useTranslation(['tasks']);
+  const textareaRef = useRef<HTMLTextAreaElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    if (autoFocus && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [autoFocus]);
+
+  const handleDrop = useCallback(
+    async (acceptedFiles: File[]) => {
+      for (const file of acceptedFiles) {
+        try {
+          const img = await upload(file);
+          onImagesChange(row.id, [...row.images, img]);
+        } catch {
+          // Silently ignore upload errors
+        }
+      }
+    },
+    [upload, row.id, row.images, onImagesChange]
+  );
+
+  const { getRootProps, getInputProps, isDragActive, open: openDropzone } =
+    useDropzone({
+      onDrop: handleDrop,
+      accept: { 'image/*': [] },
+      disabled: disabled,
+      noClick: true,
+      noKeyboard: true,
+    });
+
+  const handlePaste = useCallback(
+    async (e: React.ClipboardEvent) => {
+      const items = e.clipboardData.items;
+      const imageFiles: File[] = [];
+
+      for (const item of items) {
+        if (item.type.startsWith('image/')) {
+          const file = item.getAsFile();
+          if (file) {
+            imageFiles.push(file);
+          }
+        }
+      }
+
+      if (imageFiles.length > 0) {
+        e.preventDefault();
+        for (const file of imageFiles) {
+          try {
+            const img = await upload(file);
+            onImagesChange(row.id, [...row.images, img]);
+          } catch {
+            // Silently ignore upload errors
+          }
+        }
+      }
+    },
+    [upload, row.id, row.images, onImagesChange]
+  );
+
+  const handleRemoveImage = useCallback(
+    (imageId: string) => {
+      onImagesChange(
+        row.id,
+        row.images.filter((img) => img.id !== imageId)
+      );
+    },
+    [row.id, row.images, onImagesChange]
+  );
+
+  const handleAttachClick = () => {
+    openDropzone();
+  };
+
+  return (
+    <div
+      {...getRootProps()}
+      className={cn(
+        'relative rounded-lg border bg-background transition-colors',
+        isDragActive && 'border-primary bg-primary/5',
+        'group'
+      )}
+    >
+      <input {...getInputProps()} />
+      <input
+        ref={fileInputRef}
+        type="file"
+        accept="image/*"
+        multiple
+        className="hidden"
+        onChange={(e) => {
+          const files = Array.from(e.target.files || []);
+          handleDrop(files);
+          e.target.value = '';
+        }}
+      />
+
+      {/* Drag overlay */}
+      {isDragActive && (
+        <div className="absolute inset-0 z-10 rounded-lg bg-primary/10 border-2 border-dashed border-primary flex items-center justify-center pointer-events-none">
+          <div className="text-center">
+            <ImageIcon className="h-8 w-8 mx-auto mb-2 text-primary" />
+            <p className="text-sm font-medium">{t('dropzone.dropImagesHere')}</p>
+          </div>
+        </div>
+      )}
+
+      {/* Main content */}
+      <div className="p-3 space-y-2">
+        {/* Textarea */}
+        <AutoExpandingTextarea
+          ref={textareaRef}
+          value={row.prompt}
+          onChange={(e) => onChange(row.id, 'prompt', e.target.value)}
+          onKeyDown={(e) => onKeyDown(e, row.id)}
+          onPaste={handlePaste}
+          placeholder={placeholder}
+          disabled={disabled}
+          maxRows={8}
+          className="w-full bg-transparent text-sm resize-none border-0 focus:ring-0 p-0 min-h-[60px] placeholder:text-muted-foreground"
+        />
+
+        {/* Image previews */}
+        {row.images.length > 0 && (
+          <div className="flex flex-wrap gap-2 pt-1">
+            {row.images.map((image) => (
+              <ImageThumbnail
+                key={image.id}
+                image={image}
+                onRemove={() => handleRemoveImage(image.id)}
+                disabled={disabled}
+              />
+            ))}
+          </div>
+        )}
+
+        {/* Row footer */}
+        <div className="flex items-center justify-between pt-1 border-t border-dashed">
+          <div className="flex items-center gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              onClick={handleAttachClick}
+              disabled={disabled}
+              className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
+            >
+              <Paperclip className="h-3.5 w-3.5 mr-1" />
+              {t('quickInput.attach')}
+            </Button>
+            {row.images.length > 0 && (
+              <span className="text-xs text-muted-foreground">
+                {t('quickInput.imageCount', { count: row.images.length })}
+              </span>
+            )}
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="w-36">
+              <BranchCombobox
+                branches={branches}
+                value={row.branch}
+                onChange={(value) => onChange(row.id, 'branch', value)}
+                disabled={disabled}
+                isLoading={branchesLoading}
+              />
+            </div>
+            {showRemove && (
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => onRemove(row.id)}
+                disabled={disabled}
+                className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+              >
+                <X className="h-4 w-4" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+export function QuickTaskInput({
+  projectId,
+  className,
+  defaultCollapsed = false,
+}: QuickTaskInputProps) {
+  const { t } = useTranslation(['tasks', 'common']);
+  const { createTask, createAndStart } = useTaskMutations(projectId);
+  const { system, profiles, loading: userSystemLoading } = useUserSystem();
+  const { upload } = useImageUpload();
+
+  // Use a counter for generating unique IDs
+  const idCounter = useRef(1);
+  const generateId = () => `task-${idCounter.current++}`;
+
+  const [isCollapsed, setIsCollapsed] = useState(defaultCollapsed);
+  const [rows, setRows] = useState<TaskRow[]>(() => [
+    { id: generateId(), prompt: '', branch: null, images: [] },
+  ]);
+  const [autoStart, setAutoStart] = useState(true);
+  const [executorProfileId, setExecutorProfileId] =
+    useState<ExecutorProfileId | null>(null);
+  const [submittingCount, setSubmittingCount] = useState(0);
+  const [newRowId, setNewRowId] = useState<string | null>(null);
+
+  // Set default executor profile when config loads
+  useEffect(() => {
+    if (system.config?.executor_profile && !executorProfileId) {
+      setExecutorProfileId(system.config.executor_profile);
+    }
+  }, [system.config?.executor_profile, executorProfileId]);
+
+  const { data: projectRepos = [] } = useProjectRepos(projectId);
+  const { configs: repoBranchConfigs, isLoading: branchesLoading } =
+    useRepoBranchSelection({
+      repos: projectRepos,
+      enabled: projectRepos.length > 0,
+    });
+
+  // Get default branch when configs load
+  const defaultBranch = useMemo(() => {
+    if (repoBranchConfigs.length > 0 && repoBranchConfigs[0].targetBranch) {
+      return repoBranchConfigs[0].targetBranch;
+    }
+    return null;
+  }, [repoBranchConfigs]);
+
+  // Get branches from the first repo (for single-repo projects)
+  const branches = useMemo(() => {
+    if (repoBranchConfigs.length > 0) {
+      return repoBranchConfigs[0].branches;
+    }
+    return [];
+  }, [repoBranchConfigs]);
+
+  // Get first repo ID
+  const repoId = useMemo(() => {
+    if (projectRepos.length > 0) {
+      return projectRepos[0].id;
+    }
+    return null;
+  }, [projectRepos]);
+
+  // Initialize branch for first row when default branch is available
+  useEffect(() => {
+    if (defaultBranch && rows.length > 0 && rows[0].branch === null) {
+      setRows((prev) =>
+        prev.map((row, idx) =>
+          idx === 0 && row.branch === null
+            ? { ...row, branch: defaultBranch }
+            : row
+        )
+      );
+    }
+  }, [defaultBranch, rows]);
+
+  const isSubmitting = submittingCount > 0;
+
+  const validRows = useMemo(() => {
+    return rows.filter((row) => {
+      if (!row.prompt.trim()) return false;
+      if (autoStart && !row.branch) return false;
+      return true;
+    });
+  }, [rows, autoStart]);
+
+  const canSubmit = useMemo(() => {
+    if (validRows.length === 0) return false;
+    if (autoStart && !executorProfileId) return false;
+    if (autoStart && !repoId) return false;
+    return true;
+  }, [validRows, autoStart, executorProfileId, repoId]);
+
+  const handleRowChange = useCallback(
+    (id: string, field: 'prompt' | 'branch', value: string) => {
+      setRows((prev) =>
+        prev.map((row) => (row.id === id ? { ...row, [field]: value } : row))
+      );
+    },
+    []
+  );
+
+  const handleImagesChange = useCallback(
+    (id: string, images: ImageResponse[]) => {
+      setRows((prev) =>
+        prev.map((row) => (row.id === id ? { ...row, images } : row))
+      );
+    },
+    []
+  );
+
+  const handleAddRow = useCallback(() => {
+    const newId = generateId();
+    setRows((prev) => [
+      ...prev,
+      { id: newId, prompt: '', branch: defaultBranch, images: [] },
+    ]);
+    setNewRowId(newId);
+  }, [defaultBranch]);
+
+  const handleRemoveRow = useCallback((id: string) => {
+    setRows((prev) => {
+      if (prev.length <= 1) return prev;
+      return prev.filter((row) => row.id !== id);
+    });
+  }, []);
+
+  const handleSubmit = useCallback(async () => {
+    if (!canSubmit || isSubmitting) return;
+
+    setSubmittingCount(validRows.length);
+
+    const results: { success: boolean; row: TaskRow }[] = [];
+
+    for (const row of validRows) {
+      const imageIds =
+        row.images.length > 0 ? row.images.map((img) => img.id) : null;
+
+      const task = {
+        project_id: projectId,
+        title: row.prompt.trim(),
+        description: null,
+        status: null,
+        parent_workspace_id: null,
+        image_ids: imageIds,
+        shared_task_id: null,
+      };
+
+      try {
+        if (autoStart && repoId) {
+          const repos = [{ repo_id: repoId, target_branch: row.branch! }];
+          await createAndStart.mutateAsync({
+            task,
+            executor_profile_id: executorProfileId!,
+            repos,
+          });
+        } else {
+          await createTask.mutateAsync(task);
+        }
+        results.push({ success: true, row });
+      } catch (error) {
+        console.error('Failed to create task:', error);
+        results.push({ success: false, row });
+      }
+      setSubmittingCount((c) => c - 1);
+    }
+
+    // Reset rows that were successfully submitted
+    const successfulIds = results
+      .filter((r) => r.success)
+      .map((r) => r.row.id);
+    setRows((prev) => {
+      const remaining = prev.filter((row) => !successfulIds.includes(row.id));
+      if (remaining.length === 0) {
+        return [{ id: generateId(), prompt: '', branch: defaultBranch, images: [] }];
+      }
+      return remaining;
+    });
+  }, [
+    canSubmit,
+    isSubmitting,
+    validRows,
+    projectId,
+    autoStart,
+    repoId,
+    executorProfileId,
+    createAndStart,
+    createTask,
+    defaultBranch,
+  ]);
+
+  const handleKeyDown = useCallback(
+    (e: React.KeyboardEvent, rowId: string) => {
+      // Cmd/Ctrl + Enter to submit
+      if (e.key === 'Enter' && (e.metaKey || e.ctrlKey)) {
+        e.preventDefault();
+        handleSubmit();
+        return;
+      }
+      // Backspace on empty row removes it (only if cursor is at start)
+      if (e.key === 'Backspace') {
+        const row = rows.find((r) => r.id === rowId);
+        const target = e.target as HTMLTextAreaElement;
+        if (row && !row.prompt && rows.length > 1 && target.selectionStart === 0) {
+          e.preventDefault();
+          handleRemoveRow(rowId);
+        }
+      }
+    },
+    [rows, handleSubmit, handleRemoveRow]
+  );
+
+  const loading = branchesLoading || userSystemLoading;
+
+  // Collapsed state - show a compact bar
+  if (isCollapsed) {
+    return (
+      <div className={cn('w-full', className)}>
+        <Button
+          variant="outline"
+          onClick={() => setIsCollapsed(false)}
+          className="w-full justify-start gap-2 h-10 text-muted-foreground hover:text-foreground"
+        >
+          <MessageSquarePlus className="h-4 w-4" />
+          <span className="text-sm">{t('quickInput.placeholderFirst')}</span>
+          <ChevronDown className="h-4 w-4 ml-auto" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn('w-full max-w-2xl mx-auto', className)}>
+      {/* Collapse button */}
+      {defaultCollapsed && (
+        <div className="flex justify-end mb-2">
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setIsCollapsed(true)}
+            className="h-6 px-2 text-xs text-muted-foreground"
+          >
+            <ChevronUp className="h-3 w-3 mr-1" />
+            {t('quickInput.collapse')}
+          </Button>
+        </div>
+      )}
+
+      <div className="space-y-3">
+        {/* Task rows */}
+        {rows.map((row, idx) => (
+          <TaskRowInput
+            key={row.id}
+            row={row}
+            branches={branches}
+            branchesLoading={branchesLoading}
+            onChange={handleRowChange}
+            onImagesChange={handleImagesChange}
+            onRemove={handleRemoveRow}
+            onKeyDown={handleKeyDown}
+            showRemove={rows.length > 1}
+            disabled={isSubmitting}
+            autoFocus={row.id === newRowId}
+            placeholder={
+              idx === 0
+                ? t('quickInput.placeholderFirst')
+                : t('quickInput.placeholderMore')
+            }
+            upload={upload}
+          />
+        ))}
+
+        {/* Add row button */}
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleAddRow}
+          disabled={isSubmitting}
+          className="w-full h-9 text-xs text-muted-foreground hover:text-foreground border border-dashed"
+        >
+          <Plus className="h-3.5 w-3.5 mr-1.5" />
+          {t('quickInput.addTask')}
+        </Button>
+      </div>
+
+      {/* Bottom toolbar */}
+      <div className="mt-4 p-3 rounded-lg border bg-muted/30">
+        <div className="flex items-center justify-between gap-3">
+          <div className="flex items-center gap-2">
+            <Switch
+              id="quick-autostart"
+              checked={autoStart}
+              onCheckedChange={setAutoStart}
+              disabled={isSubmitting || loading}
+              className="data-[state=checked]:bg-gray-900 dark:data-[state=checked]:bg-gray-100"
+            />
+            <Label
+              htmlFor="quick-autostart"
+              className="text-sm cursor-pointer text-muted-foreground"
+            >
+              {t('taskFormDialog.startLabel')}
+            </Label>
+          </div>
+
+          <div className="flex items-center gap-2">
+            {validRows.length > 1 && (
+              <span className="text-xs text-muted-foreground">
+                {t('quickInput.taskCount', { count: validRows.length })}
+              </span>
+            )}
+            <Button
+              onClick={handleSubmit}
+              disabled={!canSubmit || isSubmitting}
+              size="sm"
+              className="gap-2"
+            >
+              {isSubmitting ? (
+                <>
+                  <Loader2 className="h-4 w-4 animate-spin" />
+                  {t('quickInput.creating', { count: submittingCount })}
+                </>
+              ) : (
+                <>
+                  <Send className="h-4 w-4" />
+                  {autoStart ? t('quickInput.start') : t('quickInput.create')}
+                  {validRows.length > 1 && ` (${validRows.length})`}
+                </>
+              )}
+            </Button>
+          </div>
+        </div>
+
+        {/* Executor selector - shown when autoStart is enabled */}
+        {autoStart && !loading && profiles && (
+          <div className="mt-3 pt-3 border-t">
+            <ExecutorProfileSelector
+              profiles={profiles}
+              selectedProfile={executorProfileId}
+              onProfileSelect={setExecutorProfileId}
+              disabled={isSubmitting}
+              showLabel={false}
+              className="flex items-center gap-2 flex-row"
+              itemClassName="flex-1 min-w-0"
+            />
+          </div>
+        )}
+      </div>
+
+      {/* Hint text */}
+      <p className="text-center text-xs text-muted-foreground mt-3">
+        {t('quickInput.hintMulti')}
+      </p>
+    </div>
+  );
+}

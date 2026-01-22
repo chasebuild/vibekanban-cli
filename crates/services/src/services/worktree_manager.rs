@@ -61,6 +61,8 @@ impl WorktreeManager {
     }
 
     /// Create a worktree with a new branch
+    ///
+    /// If `base_branch` doesn't exist, falls back to the repository's HEAD branch.
     pub async fn create_worktree(
         repo_path: &Path,
         branch_name: &str,
@@ -75,8 +77,25 @@ impl WorktreeManager {
 
             tokio::task::spawn_blocking(move || {
                 let repo = Repository::open(&repo_path_owned)?;
-                let base_branch_ref =
-                    GitService::find_branch(&repo, &base_branch_owned)?.into_reference();
+
+                // Try to find the specified base branch, fall back to HEAD if not found
+                let base_branch_ref = match GitService::find_branch(&repo, &base_branch_owned) {
+                    Ok(branch) => branch.into_reference(),
+                    Err(_) => {
+                        // Base branch doesn't exist, fall back to HEAD
+                        info!(
+                            "Base branch '{}' not found, falling back to HEAD",
+                            base_branch_owned
+                        );
+                        repo.head().map_err(|e| {
+                            GitServiceError::InvalidRepository(format!(
+                                "Failed to get HEAD: {}",
+                                e
+                            ))
+                        })?
+                    }
+                };
+
                 repo.branch(
                     &branch_name_owned,
                     &base_branch_ref.peel_to_commit()?,

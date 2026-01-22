@@ -18,7 +18,23 @@
   "empty": {
     "noTasks": "No tasks found for this project.",
     "createFirst": "Create First Task",
-    "noSearchResults": "No tasks match your search."
+    "noSearchResults": "No tasks match your search.",
+    "getStarted": "Describe what you want to build and let the AI handle it.",
+    "or": "or",
+    "openFullForm": "open full task form"
+  },
+  "quickInput": {
+    "placeholderFirst": "What do you want to build? Describe your task here...",
+    "placeholderMore": "Add another task...",
+    "start": "Start",
+    "create": "Create",
+    "addTask": "Add another task",
+    "taskCount": "{{count}} tasks",
+    "creating": "Creating {{count}}...",
+    "attach": "Attach",
+    "imageCount": "{{count}} image(s)",
+    "hintMulti": "⌘↵ to start • Drag & drop or paste images • Add multiple tasks",
+    "collapse": "Collapse"
   },
   "actions": {
     "addTask": "Add task"

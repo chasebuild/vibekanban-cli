@@ -3,7 +3,7 @@ import { useNavigate, useParams, useSearchParams } from 'react-router-dom';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { AlertTriangle, Plus } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { Loader } from '@/components/ui/loader';
 import { tasksApi } from '@/lib/api';
 import type { RepoBranchStatus, Workspace } from 'shared/types';
@@ -56,6 +56,7 @@ import { DiffsPanel } from '@/components/panels/DiffsPanel';
 import TaskAttemptPanel from '@/components/panels/TaskAttemptPanel';
 import TaskPanel from '@/components/panels/TaskPanel';
 import TodoPanel from '@/components/tasks/TodoPanel';
+import { QuickTaskInput } from '@/components/tasks/QuickTaskInput';
 import { NewCard, NewCardHeader } from '@/components/ui/new-card';
 import {
   Breadcrumb,
@@ -750,41 +751,56 @@ export function ProjectTasks() {
       : `${truncated}...`;
   };
 
-  const kanbanContent =
-    tasks.length === 0 ? (
-      <div className="max-w-7xl mx-auto mt-8">
-        <Card>
-          <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">{t('empty.noTasks')}</p>
-            <Button className="mt-4" onClick={handleCreateNewTask}>
-              <Plus className="h-4 w-4 mr-2" />
-              {t('empty.createFirst')}
-            </Button>
-          </CardContent>
-        </Card>
-      </div>
-    ) : !hasVisibleTasks ? (
-      <div className="max-w-7xl mx-auto mt-8">
-        <Card>
-          <CardContent className="text-center py-8">
-            <p className="text-muted-foreground">
-              {t('empty.noSearchResults')}
-            </p>
-          </CardContent>
-        </Card>
-      </div>
-    ) : (
-      <div className="w-full h-full overflow-x-auto overflow-y-auto overscroll-x-contain">
-        <TaskKanbanBoard
-          columns={kanbanColumns}
-          onDragEnd={handleDragEnd}
-          onViewTaskDetails={handleViewTaskDetails}
-          selectedTaskId={selectedTask?.id}
-          onCreateTask={handleCreateNewTask}
-          projectId={projectId!}
-        />
-      </div>
-    );
+  const kanbanContent = (
+    <div className="w-full h-full flex flex-col">
+      {/* Quick task input - always visible, collapsed by default when tasks exist */}
+      {projectId && (
+        <div className="px-4 pt-4 pb-2 flex-shrink-0">
+          <QuickTaskInput
+            projectId={projectId}
+            defaultCollapsed={tasks.length > 0}
+          />
+        </div>
+      )}
+
+      {/* Main content area */}
+      {tasks.length === 0 ? (
+        <div className="max-w-7xl mx-auto mt-4 px-4 text-center">
+          <p className="text-muted-foreground text-sm mb-2">
+            {t('empty.noTasks')}
+          </p>
+          <Button
+            variant="link"
+            className="text-sm px-2"
+            onClick={handleCreateNewTask}
+          >
+            {t('empty.openFullForm')}
+          </Button>
+        </div>
+      ) : !hasVisibleTasks ? (
+        <div className="max-w-7xl mx-auto mt-4">
+          <Card>
+            <CardContent className="text-center py-8">
+              <p className="text-muted-foreground">
+                {t('empty.noSearchResults')}
+              </p>
+            </CardContent>
+          </Card>
+        </div>
+      ) : (
+        <div className="flex-1 overflow-x-auto overflow-y-auto overscroll-x-contain">
+          <TaskKanbanBoard
+            columns={kanbanColumns}
+            onDragEnd={handleDragEnd}
+            onViewTaskDetails={handleViewTaskDetails}
+            selectedTaskId={selectedTask?.id}
+            onCreateTask={handleCreateNewTask}
+            projectId={projectId!}
+          />
+        </div>
+      )}
+    </div>
+  );
 
   const rightHeader = selectedTask ? (
     <NewCardHeader

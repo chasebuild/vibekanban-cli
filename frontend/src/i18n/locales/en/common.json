@@ -75,7 +75,8 @@
       "current": "current",
       "remote": "remote"
     },
-    "currentDisabled": "Cannot select the current branch"
+    "currentDisabled": "Cannot select the current branch",
+    "useCustom": "Use \"{{branch}}\""
   },
   "breadcrumb": {
     "more": "More"
