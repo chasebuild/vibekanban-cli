@@ -4,7 +4,7 @@ import NiceModal, { useModal } from '@ebay/nice-modal-react';
 import { defineModal } from '@/lib/modals';
 import { useDropzone } from 'react-dropzone';
 import { useForm, useStore } from '@tanstack/react-form';
-import { Image as ImageIcon } from 'lucide-react';
+import { Image as ImageIcon, Users, User, Crown, Zap } from 'lucide-react';
 import {
   Dialog,
   DialogContent,
@@ -24,6 +24,9 @@ import {
   SelectTrigger,
   SelectValue,
 } from '@/components/ui/select';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Badge } from '@/components/ui/badge';
+import { Slider } from '@/components/ui/slider';
 import WYSIWYGEditor from '@/components/ui/wysiwyg';
 import type { LocalImageMetadata } from '@/components/ui/wysiwyg/context/task-attempt-context';
 import BranchSelector from '@/components/tasks/BranchSelector';
@@ -50,6 +53,9 @@ import type {
   ExecutorProfileId,
   ImageResponse,
 } from 'shared/types';
+
+// Execution mode type
+type ExecutionMode = 'single' | 'swarm';
 
 interface Task {
   id: string;
@@ -81,6 +87,10 @@ type TaskFormValues = {
   executorProfileId: ExecutorProfileId | null;
   repoBranches: RepoBranch[];
   autoStart: boolean;
+  // Swarm-specific options
+  executionMode: ExecutionMode;
+  maxParallelWorkers: number;
+  reviewerCount: number;
 };
 
 const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
@@ -136,6 +146,9 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
           executorProfileId: baseProfile,
           repoBranches: defaultRepoBranches,
           autoStart: false,
+          executionMode: 'single',
+          maxParallelWorkers: 3,
+          reviewerCount: 3,
         };
 
       case 'duplicate':
@@ -146,6 +159,9 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
           executorProfileId: baseProfile,
           repoBranches: defaultRepoBranches,
           autoStart: true,
+          executionMode: 'single',
+          maxParallelWorkers: 3,
+          reviewerCount: 3,
         };
 
       case 'subtask':
@@ -158,6 +174,9 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
           executorProfileId: baseProfile,
           repoBranches: defaultRepoBranches,
           autoStart: true,
+          executionMode: 'single',
+          maxParallelWorkers: 3,
+          reviewerCount: 3,
         };
     }
   }, [mode, props, system.config?.executor_profile, defaultRepoBranches]);
@@ -181,6 +200,7 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
     } else {
       const imageIds =
         newlyUploadedImageIds.length > 0 ? newlyUploadedImageIds : null;
+      const isSwarmMode = value.executionMode === 'swarm';
       const task = {
         project_id: projectId,
         title: value.title,
@@ -190,9 +210,49 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
           mode === 'subtask' ? props.parentTaskAttemptId : null,
         image_ids: imageIds,
         shared_task_id: null,
+        // Mark as epic task for swarm mode
+        is_epic: isSwarmMode ? true : null,
+        complexity: isSwarmMode ? 'epic' : null,
       };
       const shouldAutoStart = value.autoStart && !forceCreateOnlyRef.current;
-      if (shouldAutoStart) {
+      
+      if (isSwarmMode) {
+        // Create epic task and start swarm execution
+        const createdTask = await createTask.mutateAsync(task);
+        if (shouldAutoStart && createdTask) {
+          try {
+            // Create swarm execution
+            const repos = value.repoBranches.map((rb) => ({
+              repo_id: rb.repoId,
+              target_branch: rb.branch,
+            }));
+            // First create a workspace for the epic task
+            const response = await fetch('/api/swarms', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                epic_task_id: createdTask.id,
+                reviewer_count: value.reviewerCount,
+                max_parallel_workers: value.maxParallelWorkers,
+              }),
+            });
+            if (response.ok) {
+              const swarmExecution = await response.json();
+              // Generate plan
+              await fetch(`/api/swarms/${swarmExecution.id}/plan`, {
+                method: 'POST',
+              });
+              // Execute plan
+              await fetch(`/api/swarms/${swarmExecution.id}/execute`, {
+                method: 'POST',
+              });
+            }
+          } catch (err) {
+            console.error('Failed to start swarm execution:', err);
+          }
+        }
+        modal.remove();
+      } else if (shouldAutoStart) {
         const repos = value.repoBranches.map((rb) => ({
           repo_id: rb.repoId,
           target_branch: rb.branch,
@@ -497,6 +557,128 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
             </form.Field>
           )}
 
+          {/* Execution Mode Selector (Create mode only) */}
+          {!editMode && (
+            <form.Field name="executionMode">
+              {(modeField) => (
+                <div className="space-y-3">
+                  <Label className="text-sm font-medium">Execution Mode</Label>
+                  <Tabs
+                    value={modeField.state.value}
+                    onValueChange={(v) => modeField.handleChange(v as ExecutionMode)}
+                    className="w-full"
+                  >
+                    <TabsList className="grid w-full grid-cols-2">
+                      <TabsTrigger
+                        value="single"
+                        className="flex items-center gap-2"
+                        disabled={isSubmitting}
+                      >
+                        <User className="h-4 w-4" />
+                        Single Agent
+                      </TabsTrigger>
+                      <TabsTrigger
+                        value="swarm"
+                        className="flex items-center gap-2"
+                        disabled={isSubmitting}
+                      >
+                        <Users className="h-4 w-4" />
+                        Agent Swarm
+                        <Badge variant="secondary" className="ml-1 text-xs">
+                          Beta
+                        </Badge>
+                      </TabsTrigger>
+                    </TabsList>
+                  </Tabs>
+
+                  {/* Swarm description */}
+                  {modeField.state.value === 'swarm' && (
+                    <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                      <div className="flex items-start gap-2">
+                        <Crown className="h-4 w-4 text-purple-600 mt-0.5" />
+                        <div className="text-sm">
+                          <p className="font-medium text-purple-900 dark:text-purple-100">
+                            Epic Task with Agent Swarm
+                          </p>
+                          <p className="text-purple-700 dark:text-purple-300 mt-1">
+                            Your task will be analyzed by a Planner Agent and broken into subtasks. 
+                            Multiple worker agents will execute subtasks in parallel, followed by 
+                            consensus review (pBFT) before merging.
+                          </p>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              )}
+            </form.Field>
+          )}
+
+          {/* Swarm Configuration (only in swarm mode) */}
+          {!editMode && (
+            <form.Subscribe selector={(state) => state.values.executionMode}>
+              {(executionMode) =>
+                executionMode === 'swarm' && (
+                  <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
+                    <div className="flex items-center gap-2">
+                      <Zap className="h-4 w-4 text-yellow-600" />
+                      <Label className="text-sm font-medium">Swarm Configuration</Label>
+                    </div>
+
+                    {/* Max Parallel Workers */}
+                    <form.Field name="maxParallelWorkers">
+                      {(field) => (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm">Parallel Workers</Label>
+                            <span className="text-sm font-medium">{field.state.value}</span>
+                          </div>
+                          <Slider
+                            value={[field.state.value]}
+                            onValueChange={([v]) => field.handleChange(v)}
+                            min={1}
+                            max={10}
+                            step={1}
+                            disabled={isSubmitting}
+                            className="w-full"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Maximum agents working simultaneously
+                          </p>
+                        </div>
+                      )}
+                    </form.Field>
+
+                    {/* Reviewer Count */}
+                    <form.Field name="reviewerCount">
+                      {(field) => (
+                        <div className="space-y-2">
+                          <div className="flex items-center justify-between">
+                            <Label className="text-sm">Reviewers (pBFT)</Label>
+                            <span className="text-sm font-medium">{field.state.value}</span>
+                          </div>
+                          <Slider
+                            value={[field.state.value]}
+                            onValueChange={([v]) => field.handleChange(v)}
+                            min={1}
+                            max={7}
+                            step={1}
+                            disabled={isSubmitting}
+                            className="w-full"
+                          />
+                          <p className="text-xs text-muted-foreground">
+                            Needs {Math.floor((field.state.value * 2) / 3) + 1} approvals 
+                            (tolerates {Math.floor((field.state.value - 1) / 3)} faulty)
+                          </p>
+                        </div>
+                      )}
+                    </form.Field>
+                  </div>
+                )
+              }
+            </form.Subscribe>
+          )}
+
           {/* Create mode dropdowns */}
           {!editMode && (
             <form.Field name="autoStart" mode="array">
@@ -657,18 +839,34 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
                 })}
               >
                 {({ canSubmit, isSubmitting, values }) => {
-                  const buttonText = editMode
-                    ? isSubmitting
+                  const isSwarmMode = values.executionMode === 'swarm';
+                  let buttonText: string;
+                  
+                  if (editMode) {
+                    buttonText = isSubmitting
                       ? t('taskFormDialog.updating')
-                      : t('taskFormDialog.updateTask')
-                    : isSubmitting
+                      : t('taskFormDialog.updateTask');
+                  } else if (isSwarmMode) {
+                    buttonText = isSubmitting
+                      ? 'Launching Swarm...'
+                      : values.autoStart
+                        ? 'Launch Agent Swarm'
+                        : 'Create Epic Task';
+                  } else {
+                    buttonText = isSubmitting
                       ? values.autoStart
                         ? t('taskFormDialog.starting')
                         : t('taskFormDialog.creating')
                       : t('taskFormDialog.create');
+                  }
 
                   return (
-                    <Button onClick={form.handleSubmit} disabled={!canSubmit}>
+                    <Button 
+                      onClick={form.handleSubmit} 
+                      disabled={!canSubmit}
+                      className={isSwarmMode ? 'bg-purple-600 hover:bg-purple-700' : ''}
+                    >
+                      {isSwarmMode && <Users className="h-4 w-4 mr-2" />}
                       {buttonText}
                     </Button>
                   );
