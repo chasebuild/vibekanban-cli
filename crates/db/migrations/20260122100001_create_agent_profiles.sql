@@ -34,18 +34,18 @@ CREATE TABLE agent_profile_skills (
     PRIMARY KEY (agent_profile_id, agent_skill_id)
 );
 
--- Create default planner and reviewer profiles
+-- Create default planner and reviewer profiles (using proper UUIDs)
 INSERT INTO agent_profiles (id, name, description, executor, is_planner, is_reviewer, is_worker, max_concurrent_tasks) VALUES
-    ('profile-planner', 'Planner Agent', 'Specialized in task decomposition and planning', 'CLAUDE_CODE', 1, 0, 0, 1),
-    ('profile-reviewer', 'Reviewer Agent', 'Specialized in code review and consensus', 'CLAUDE_CODE', 0, 1, 0, 3),
-    ('profile-worker-general', 'General Worker', 'General-purpose worker agent', 'CLAUDE_CODE', 0, 0, 1, 2);
+    ('00000000-0001-0000-0000-000000000001', 'Planner Agent', 'Specialized in task decomposition and planning', 'CLAUDE_CODE', 1, 0, 0, 1),
+    ('00000000-0001-0000-0000-000000000002', 'Reviewer Agent', 'Specialized in code review and consensus', 'CLAUDE_CODE', 0, 1, 0, 3),
+    ('00000000-0001-0000-0000-000000000003', 'General Worker', 'General-purpose worker agent', 'CLAUDE_CODE', 0, 0, 1, 2);
 
 -- Link skills to the general worker
 INSERT INTO agent_profile_skills (agent_profile_id, agent_skill_id, proficiency) VALUES
-    ('profile-worker-general', 'skill-frontend', 3),
-    ('profile-worker-general', 'skill-backend', 3),
-    ('profile-worker-general', 'skill-testing', 2),
-    ('profile-worker-general', 'skill-documentation', 2);
+    ('00000000-0001-0000-0000-000000000003', '00000000-0000-0000-0000-000000000001', 3),
+    ('00000000-0001-0000-0000-000000000003', '00000000-0000-0000-0000-000000000002', 3),
+    ('00000000-0001-0000-0000-000000000003', '00000000-0000-0000-0000-000000000003', 2),
+    ('00000000-0001-0000-0000-000000000003', '00000000-0000-0000-0000-000000000004', 2);
 
 CREATE INDEX idx_agent_profiles_executor ON agent_profiles(executor);
 CREATE INDEX idx_agent_profiles_is_planner ON agent_profiles(is_planner);

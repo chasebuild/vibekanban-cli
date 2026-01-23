@@ -62,7 +62,8 @@ impl WorktreeManager {
 
     /// Create a worktree with a new branch
     ///
-    /// If `base_branch` doesn't exist, falls back to the repository's HEAD branch.
+    /// If `base_branch` doesn't exist, creates it from HEAD first, then creates the working branch.
+    /// This ensures the target branch exists for later diff comparisons.
     pub async fn create_worktree(
         repo_path: &Path,
         branch_name: &str,
@@ -78,21 +79,25 @@ impl WorktreeManager {
             tokio::task::spawn_blocking(move || {
                 let repo = Repository::open(&repo_path_owned)?;
 
-                // Try to find the specified base branch, fall back to HEAD if not found
+                // Try to find the specified base branch
                 let base_branch_ref = match GitService::find_branch(&repo, &base_branch_owned) {
                     Ok(branch) => branch.into_reference(),
                     Err(_) => {
-                        // Base branch doesn't exist, fall back to HEAD
+                        // Base branch doesn't exist - create it from HEAD
+                        // This ensures the target branch exists for later diff comparisons
                         info!(
-                            "Base branch '{}' not found, falling back to HEAD",
+                            "Base branch '{}' not found, creating it from HEAD",
                             base_branch_owned
                         );
-                        repo.head().map_err(|e| {
-                            GitServiceError::InvalidRepository(format!(
-                                "Failed to get HEAD: {}",
-                                e
-                            ))
-                        })?
+                        let head_ref = repo.head().map_err(|e| {
+                            GitServiceError::InvalidRepository(format!("Failed to get HEAD: {}", e))
+                        })?;
+                        let head_commit = head_ref.peel_to_commit()?;
+
+                        // Create the base branch from HEAD
+                        let new_branch = repo.branch(&base_branch_owned, &head_commit, false)?;
+                        info!("Created new branch '{}' from HEAD", base_branch_owned);
+                        new_branch.into_reference()
                     }
                 };
 

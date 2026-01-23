@@ -50,6 +50,7 @@ import { useHotkeysContext } from 'react-hotkeys-hook';
 import { cn } from '@/lib/utils';
 import type {
   TaskStatus,
+  TaskComplexity,
   ExecutorProfileId,
   ImageResponse,
 } from 'shared/types';
@@ -193,6 +194,9 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
             status: value.status,
             parent_workspace_id: null,
             image_ids: images.length > 0 ? images.map((img) => img.id) : null,
+            is_epic: null,
+            complexity: null,
+            metadata: null,
           },
         },
         { onSuccess: () => modal.remove() }
@@ -209,10 +213,10 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
         parent_workspace_id:
           mode === 'subtask' ? props.parentTaskAttemptId : null,
         image_ids: imageIds,
-        shared_task_id: null,
+        metadata: null,
         // Mark as epic task for swarm mode
         is_epic: isSwarmMode ? true : null,
-        complexity: isSwarmMode ? 'epic' : null,
+        complexity: isSwarmMode ? ('epic' as TaskComplexity) : null,
       };
       const shouldAutoStart = value.autoStart && !forceCreateOnlyRef.current;
       
@@ -222,11 +226,6 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
         if (shouldAutoStart && createdTask) {
           try {
             // Create swarm execution
-            const repos = value.repoBranches.map((rb) => ({
-              repo_id: rb.repoId,
-              target_branch: rb.branch,
-            }));
-            // First create a workspace for the epic task
             const response = await fetch('/api/swarms', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
@@ -236,19 +235,36 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
                 max_parallel_workers: value.maxParallelWorkers,
               }),
             });
-            if (response.ok) {
+            if (!response.ok) {
+              const errorText = await response.text();
+              console.error('Failed to create swarm execution:', response.status, errorText);
+              // Show error to user - swarm creation failed but task was created
+              alert(`Epic task created, but swarm execution failed to start: ${errorText}\n\nPlease configure a planner agent in Settings → Agents.`);
+            } else {
               const swarmExecution = await response.json();
               // Generate plan
-              await fetch(`/api/swarms/${swarmExecution.id}/plan`, {
+              const planResponse = await fetch(`/api/swarms/${swarmExecution.id}/plan`, {
                 method: 'POST',
               });
-              // Execute plan
-              await fetch(`/api/swarms/${swarmExecution.id}/execute`, {
-                method: 'POST',
-              });
+              if (!planResponse.ok) {
+                const planError = await planResponse.text();
+                console.error('Failed to generate plan:', planError);
+                alert(`Swarm execution created, but plan generation failed: ${planError}`);
+              } else {
+                // Execute plan
+                const executeResponse = await fetch(`/api/swarms/${swarmExecution.id}/execute`, {
+                  method: 'POST',
+                });
+                if (!executeResponse.ok) {
+                  const execError = await executeResponse.text();
+                  console.error('Failed to execute plan:', execError);
+                  alert(`Plan generated, but execution failed: ${execError}`);
+                }
+              }
             }
           } catch (err) {
             console.error('Failed to start swarm execution:', err);
+            alert(`Failed to start swarm execution: ${err}`);
           }
         }
         modal.remove();
@@ -274,7 +290,9 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
   const validator = (value: TaskFormValues): string | undefined => {
     if (!value.title.trim().length) return 'need title';
     if (value.autoStart && !forceCreateOnlyRef.current) {
-      if (!value.executorProfileId) return 'need executor profile';
+      // In swarm mode, we don't need an executor profile - the swarm manages execution
+      const isSwarmMode = value.executionMode === 'swarm';
+      if (!isSwarmMode && !value.executorProfileId) return 'need executor profile';
       if (
         value.repoBranches.length === 0 ||
         value.repoBranches.some((rb) => !rb.branch)

@@ -887,17 +887,19 @@ pub async fn change_target_branch(
         .await?
         .ok_or(RepoError::NotFound)?;
 
+    // If branch doesn't exist, create it from HEAD
     if !deployment
         .git()
         .check_branch_exists(&repo.path, &new_target_branch)?
     {
-        return Ok(ResponseJson(ApiResponse::error(
-            format!(
-                "Branch '{}' does not exist in repository '{}'",
-                new_target_branch, repo.name
-            )
-            .as_str(),
-        )));
+        tracing::info!(
+            "Target branch '{}' does not exist in repository '{}', creating from HEAD",
+            new_target_branch,
+            repo.name
+        );
+        deployment
+            .git()
+            .create_branch_from_head(&repo.path, &new_target_branch)?;
     };
 
     WorkspaceRepo::update_target_branch(pool, workspace.id, repo_id, &new_target_branch).await?;

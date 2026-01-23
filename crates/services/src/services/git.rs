@@ -1457,6 +1457,22 @@ impl GitService {
         }
     }
 
+    /// Create a new branch from HEAD
+    pub fn create_branch_from_head(
+        &self,
+        repo_path: &Path,
+        branch_name: &str,
+    ) -> Result<(), GitServiceError> {
+        let repo = self.open_repo(repo_path)?;
+        let head = repo.head().map_err(|e| {
+            GitServiceError::InvalidRepository(format!("Failed to get HEAD: {}", e))
+        })?;
+        let head_commit = head.peel_to_commit()?;
+        repo.branch(branch_name, &head_commit, false)?;
+        tracing::info!("Created branch '{}' from HEAD in {:?}", branch_name, repo_path);
+        Ok(())
+    }
+
     pub fn rename_local_branch(
         &self,
         worktree_path: &Path,

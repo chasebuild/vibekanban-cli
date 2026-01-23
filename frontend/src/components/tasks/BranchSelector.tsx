@@ -2,7 +2,7 @@ import { useState, useMemo, useRef, useEffect, useCallback, memo } from 'react';
 import { Virtuoso, VirtuosoHandle } from 'react-virtuoso';
 import { useTranslation } from 'react-i18next';
 import { Button } from '@/components/ui/button.tsx';
-import { ArrowDown, GitBranch as GitBranchIcon, Search } from 'lucide-react';
+import { ArrowDown, GitBranch as GitBranchIcon, Search, Plus } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -27,6 +27,8 @@ type Props = {
   className?: string;
   excludeCurrentBranch?: boolean;
   disabledTooltip?: string;
+  /** Allow creating new branches by typing a name that doesn't exist */
+  allowCreate?: boolean;
 };
 
 type RowProps = {
@@ -108,6 +110,7 @@ function BranchSelector({
   className = '',
   excludeCurrentBranch = false,
   disabledTooltip,
+  allowCreate = true,
 }: Props) {
   const { t } = useTranslation(['common']);
   const [branchSearchTerm, setBranchSearchTerm] = useState('');
@@ -128,6 +131,16 @@ function BranchSelector({
     }
     return filtered;
   }, [branches, branchSearchTerm]);
+
+  // Check if search term matches any existing branch (for create option)
+  const exactMatch = useMemo(() => {
+    if (!branchSearchTerm.trim()) return true;
+    return branches.some(
+      (b) => b.name.toLowerCase() === branchSearchTerm.trim().toLowerCase()
+    );
+  }, [branches, branchSearchTerm]);
+
+  const showCreateOption = allowCreate && branchSearchTerm.trim() && !exactMatch;
 
   const handleBranchSelect = useCallback(
     (branchName: string) => {
@@ -182,7 +195,18 @@ function BranchSelector({
   );
 
   const attemptSelect = useCallback(() => {
-    if (highlightedIndex == null) return;
+    // If create option is shown and highlighted (index -1), create the branch
+    if (showCreateOption && highlightedIndex === -1) {
+      handleBranchSelect(branchSearchTerm.trim());
+      return;
+    }
+    if (highlightedIndex == null || highlightedIndex < 0) {
+      // If no selection but create is available, create on Enter
+      if (showCreateOption) {
+        handleBranchSelect(branchSearchTerm.trim());
+      }
+      return;
+    }
     const branch = filteredBranches[highlightedIndex];
     if (!branch) return;
     if (isBranchDisabled(branch)) return;
@@ -192,6 +216,8 @@ function BranchSelector({
     filteredBranches,
     isBranchDisabled,
     handleBranchSelect,
+    showCreateOption,
+    branchSearchTerm,
   ]);
 
   return (
@@ -264,11 +290,22 @@ function BranchSelector({
             </div>
           </div>
           <DropdownMenuSeparator />
-          {filteredBranches.length === 0 ? (
+          {/* Create new branch option */}
+          {showCreateOption && (
+            <DropdownMenuItem
+              onMouseEnter={() => setHighlightedIndex(-1)}
+              onSelect={() => handleBranchSelect(branchSearchTerm.trim())}
+              className={highlightedIndex === -1 ? 'bg-accent/70 ring-2 ring-accent' : ''}
+            >
+              <Plus className="h-4 w-4 mr-2" />
+              {t('branchSelector.useCustom', { branch: branchSearchTerm.trim() })}
+            </DropdownMenuItem>
+          )}
+          {filteredBranches.length === 0 && !showCreateOption ? (
             <div className="p-2 text-sm text-muted-foreground text-center">
               {t('branchSelector.empty')}
             </div>
-          ) : (
+          ) : filteredBranches.length > 0 ? (
             <Virtuoso
               ref={virtuosoRef}
               style={{ height: '16rem' }}
@@ -297,7 +334,7 @@ function BranchSelector({
                 );
               }}
             />
-          )}
+          ) : null}
         </DropdownMenuContent>
       </TooltipProvider>
     </DropdownMenu>

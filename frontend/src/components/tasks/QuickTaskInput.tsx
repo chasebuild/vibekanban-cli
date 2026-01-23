@@ -14,12 +14,19 @@ import {
   Image as ImageIcon,
   Paperclip,
   MessageSquarePlus,
+  User,
+  Users,
+  Crown,
+  Zap,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { AutoExpandingTextarea } from '@/components/ui/auto-expanding-textarea';
 import { Switch } from '@/components/ui/switch';
 import { Label } from '@/components/ui/label';
+import { Slider } from '@/components/ui/slider';
+import { Badge } from '@/components/ui/badge';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { ExecutorProfileSelector } from '@/components/settings';
 import {
   DropdownMenu,
@@ -42,6 +49,9 @@ import type {
   ImageResponse,
 } from 'shared/types';
 
+// Execution mode type
+type ExecutionMode = 'single' | 'swarm';
+
 interface TaskRow {
   id: string;
   prompt: string;
@@ -56,7 +66,7 @@ interface QuickTaskInputProps {
   defaultCollapsed?: boolean;
 }
 
-// Creatable branch selector component
+// Branch selector component with support for custom branch names
 interface BranchComboboxProps {
   branches: GitBranchType[];
   value: string | null;
@@ -85,7 +95,7 @@ function BranchCombobox({
     return branches.filter((b) => b.name.toLowerCase().includes(q));
   }, [branches, search]);
 
-  // Check if search matches any existing branch
+  // Check if search matches any existing branch - allow creating new branches
   const exactMatch = branches.find(
     (b) => b.name.toLowerCase() === search.trim().toLowerCase()
   );
@@ -467,6 +477,30 @@ export function QuickTaskInput({
     useState<ExecutorProfileId | null>(null);
   const [submittingCount, setSubmittingCount] = useState(0);
   const [newRowId, setNewRowId] = useState<string | null>(null);
+  
+  // Agent Swarm mode state
+  const [executionMode, setExecutionMode] = useState<ExecutionMode>('single');
+  const [maxParallelWorkers, setMaxParallelWorkers] = useState(3);
+  const [reviewerCount, setReviewerCount] = useState(3);
+  
+  const isSwarmMode = executionMode === 'swarm';
+  
+  // When swarm mode is selected, force autoStart to be true
+  // (swarm mode doesn't make sense without starting execution)
+  const handleExecutionModeChange = useCallback((mode: ExecutionMode) => {
+    setExecutionMode(mode);
+    if (mode === 'swarm') {
+      setAutoStart(true);
+    }
+  }, []);
+  
+  // When autoStart is toggled off, reset to single mode
+  const handleAutoStartChange = useCallback((checked: boolean) => {
+    setAutoStart(checked);
+    if (!checked && isSwarmMode) {
+      setExecutionMode('single');
+    }
+  }, [isSwarmMode]);
 
   // Set default executor profile when config loads
   useEffect(() => {
@@ -520,21 +554,30 @@ export function QuickTaskInput({
   }, [defaultBranch, rows]);
 
   const isSubmitting = submittingCount > 0;
+  
+  // In swarm mode, autoStart is always effectively true
+  const effectiveAutoStart = isSwarmMode ? true : autoStart;
 
   const validRows = useMemo(() => {
     return rows.filter((row) => {
       if (!row.prompt.trim()) return false;
-      if (autoStart && !row.branch) return false;
+      // In single agent mode with autostart, we need a branch
+      // In swarm mode, branch is still used but we use the default branch if not set
+      if (effectiveAutoStart && !isSwarmMode && !row.branch) return false;
       return true;
     });
-  }, [rows, autoStart]);
+  }, [rows, effectiveAutoStart, isSwarmMode]);
 
   const canSubmit = useMemo(() => {
     if (validRows.length === 0) return false;
-    if (autoStart && !executorProfileId) return false;
-    if (autoStart && !repoId) return false;
+    // In swarm mode, we don't need an executor profile - the swarm manages execution
+    if (effectiveAutoStart && !isSwarmMode && !executorProfileId) return false;
+    // In single agent mode with autostart, we need a repo
+    if (effectiveAutoStart && !isSwarmMode && !repoId) return false;
+    // In swarm mode, we need a repo for the workers
+    if (isSwarmMode && !repoId) return false;
     return true;
-  }, [validRows, autoStart, executorProfileId, repoId]);
+  }, [validRows, effectiveAutoStart, isSwarmMode, executorProfileId, repoId]);
 
   const handleRowChange = useCallback(
     (id: string, field: 'prompt' | 'branch', value: string) => {
@@ -588,21 +631,73 @@ export function QuickTaskInput({
         status: null,
         parent_workspace_id: null,
         image_ids: imageIds,
-        shared_task_id: null,
+        metadata: null,
+        // Mark as epic task for swarm mode
+        is_epic: isSwarmMode ? true : null,
+        complexity: isSwarmMode ? ('epic' as const) : null,
       };
 
       try {
-        if (autoStart && repoId) {
+        if (isSwarmMode && repoId) {
+          // Swarm mode: create epic task and start swarm execution
+          const createdTask = await createTask.mutateAsync(task);
+          if (createdTask) {
+            try {
+              // Create swarm execution
+              const response = await fetch('/api/swarms', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                  epic_task_id: createdTask.id,
+                  reviewer_count: reviewerCount,
+                  max_parallel_workers: maxParallelWorkers,
+                }),
+              });
+              if (!response.ok) {
+                const errorText = await response.text();
+                console.error('Failed to create swarm execution:', response.status, errorText);
+                alert(`Epic task created, but swarm execution failed: ${errorText}\n\nPlease configure a planner agent in Settings → Agents.`);
+              } else {
+                const swarmExecution = await response.json();
+                // Generate plan
+                const planResponse = await fetch(`/api/swarms/${swarmExecution.id}/plan`, {
+                  method: 'POST',
+                });
+                if (!planResponse.ok) {
+                  const planError = await planResponse.text();
+                  console.error('Failed to generate plan:', planError);
+                  alert(`Swarm created, but plan generation failed: ${planError}`);
+                } else {
+                  // Execute plan
+                  const executeResponse = await fetch(`/api/swarms/${swarmExecution.id}/execute`, {
+                    method: 'POST',
+                  });
+                  if (!executeResponse.ok) {
+                    const execError = await executeResponse.text();
+                    console.error('Failed to execute plan:', execError);
+                    alert(`Plan generated, but execution failed: ${execError}`);
+                  }
+                }
+              }
+            } catch (err) {
+              console.error('Failed to start swarm execution:', err);
+              alert(`Failed to start swarm execution: ${err}`);
+            }
+          }
+          results.push({ success: true, row });
+        } else if (autoStart && repoId) {
+          // Single agent mode
           const repos = [{ repo_id: repoId, target_branch: row.branch! }];
           await createAndStart.mutateAsync({
             task,
             executor_profile_id: executorProfileId!,
             repos,
           });
+          results.push({ success: true, row });
         } else {
           await createTask.mutateAsync(task);
+          results.push({ success: true, row });
         }
-        results.push({ success: true, row });
       } catch (error) {
         console.error('Failed to create task:', error);
         results.push({ success: false, row });
@@ -632,6 +727,9 @@ export function QuickTaskInput({
     createAndStart,
     createTask,
     defaultBranch,
+    isSwarmMode,
+    maxParallelWorkers,
+    reviewerCount,
   ]);
 
   const handleKeyDown = useCallback(
@@ -730,20 +828,29 @@ export function QuickTaskInput({
 
       {/* Bottom toolbar */}
       <div className="mt-4 p-3 rounded-lg border bg-muted/30">
+        {/* Start toggle and submit button row */}
         <div className="flex items-center justify-between gap-3">
           <div className="flex items-center gap-2">
             <Switch
               id="quick-autostart"
-              checked={autoStart}
-              onCheckedChange={setAutoStart}
-              disabled={isSubmitting || loading}
+              checked={effectiveAutoStart}
+              onCheckedChange={handleAutoStartChange}
+              disabled={isSubmitting || loading || isSwarmMode}
               className="data-[state=checked]:bg-gray-900 dark:data-[state=checked]:bg-gray-100"
             />
             <Label
               htmlFor="quick-autostart"
-              className="text-sm cursor-pointer text-muted-foreground"
+              className={cn(
+                'text-sm cursor-pointer text-muted-foreground',
+                isSwarmMode && 'opacity-70'
+              )}
             >
               {t('taskFormDialog.startLabel')}
+              {isSwarmMode && (
+                <span className="ml-1 text-xs text-purple-600 dark:text-purple-400">
+                  (required)
+                </span>
+              )}
             </Label>
           </div>
 
@@ -757,17 +864,30 @@ export function QuickTaskInput({
               onClick={handleSubmit}
               disabled={!canSubmit || isSubmitting}
               size="sm"
-              className="gap-2"
+              className={cn(
+                'gap-2',
+                isSwarmMode && 'bg-purple-600 hover:bg-purple-700'
+              )}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {t('quickInput.creating', { count: submittingCount })}
+                  {isSwarmMode
+                    ? t('quickInput.launchingSwarm', { count: submittingCount })
+                    : t('quickInput.creating', { count: submittingCount })}
                 </>
               ) : (
                 <>
-                  <Send className="h-4 w-4" />
-                  {autoStart ? t('quickInput.start') : t('quickInput.create')}
+                  {isSwarmMode ? (
+                    <Users className="h-4 w-4" />
+                  ) : (
+                    <Send className="h-4 w-4" />
+                  )}
+                  {isSwarmMode
+                    ? t('quickInput.launchSwarm')
+                    : autoStart
+                      ? t('quickInput.start')
+                      : t('quickInput.create')}
                   {validRows.length > 1 && ` (${validRows.length})`}
                 </>
               )}
@@ -775,8 +895,113 @@ export function QuickTaskInput({
           </div>
         </div>
 
-        {/* Executor selector - shown when autoStart is enabled */}
-        {autoStart && !loading && profiles && (
+        {/* Execution Mode Selector */}
+        {autoStart && (
+          <div className="mt-3 pt-3 border-t space-y-3">
+            <Tabs
+              value={executionMode}
+              onValueChange={(v) => handleExecutionModeChange(v as ExecutionMode)}
+              className="w-full"
+            >
+              <TabsList className="grid w-full grid-cols-2 h-9">
+                <TabsTrigger
+                  value="single"
+                  className="flex items-center gap-1.5 text-xs"
+                  disabled={isSubmitting}
+                >
+                  <User className="h-3.5 w-3.5" />
+                  {t('quickInput.singleAgent')}
+                </TabsTrigger>
+                <TabsTrigger
+                  value="swarm"
+                  className="flex items-center gap-1.5 text-xs"
+                  disabled={isSubmitting}
+                >
+                  <Users className="h-3.5 w-3.5" />
+                  {t('quickInput.agentSwarm')}
+                  <Badge variant="secondary" className="ml-1 text-[10px] px-1 py-0">
+                    Beta
+                  </Badge>
+                </TabsTrigger>
+              </TabsList>
+            </Tabs>
+
+            {/* Swarm description */}
+            {isSwarmMode && (
+              <div className="p-2.5 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
+                <div className="flex items-start gap-2">
+                  <Crown className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
+                  <div className="text-xs">
+                    <p className="font-medium text-purple-900 dark:text-purple-100">
+                      {t('quickInput.swarmTitle')}
+                    </p>
+                    <p className="text-purple-700 dark:text-purple-300 mt-0.5">
+                      {t('quickInput.swarmDescription')}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Swarm Configuration */}
+            {isSwarmMode && (
+              <div className="space-y-3 p-3 border rounded-lg bg-background">
+                <div className="flex items-center gap-2">
+                  <Zap className="h-3.5 w-3.5 text-yellow-600" />
+                  <Label className="text-xs font-medium">
+                    {t('quickInput.swarmConfig')}
+                  </Label>
+                </div>
+
+                {/* Max Parallel Workers */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">{t('quickInput.parallelWorkers')}</Label>
+                    <span className="text-xs font-medium">{maxParallelWorkers}</span>
+                  </div>
+                  <Slider
+                    value={[maxParallelWorkers]}
+                    onValueChange={([v]) => setMaxParallelWorkers(v)}
+                    min={1}
+                    max={10}
+                    step={1}
+                    disabled={isSubmitting}
+                    className="w-full"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    {t('quickInput.parallelWorkersHint')}
+                  </p>
+                </div>
+
+                {/* Reviewer Count */}
+                <div className="space-y-1.5">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-xs">{t('quickInput.reviewers')}</Label>
+                    <span className="text-xs font-medium">{reviewerCount}</span>
+                  </div>
+                  <Slider
+                    value={[reviewerCount]}
+                    onValueChange={([v]) => setReviewerCount(v)}
+                    min={1}
+                    max={7}
+                    step={1}
+                    disabled={isSubmitting}
+                    className="w-full"
+                  />
+                  <p className="text-[10px] text-muted-foreground">
+                    {t('quickInput.reviewersHint', {
+                      approvals: Math.floor((reviewerCount * 2) / 3) + 1,
+                      faulty: Math.floor((reviewerCount - 1) / 3),
+                    })}
+                  </p>
+                </div>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Executor selector - shown when autoStart is enabled and NOT in swarm mode */}
+        {autoStart && !isSwarmMode && !loading && profiles && (
           <div className="mt-3 pt-3 border-t">
             <ExecutorProfileSelector
               profiles={profiles}
@@ -793,7 +1018,7 @@ export function QuickTaskInput({
 
       {/* Hint text */}
       <p className="text-center text-xs text-muted-foreground mt-3">
-        {t('quickInput.hintMulti')}
+        {isSwarmMode ? t('quickInput.hintSwarm') : t('quickInput.hintMulti')}
       </p>
     </div>
   );
