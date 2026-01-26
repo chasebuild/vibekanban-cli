@@ -1,0 +1,48 @@
+[package]
+name = "vibe-kanban-cli"
+version = "0.1.0"
+edition = "2024"
+description = "Interactive CLI for Vibe Kanban"
+authors = ["Vibe Kanban Team"]
+
+[dependencies]
+# Async runtime
+tokio = { workspace = true }
+
+# HTTP client for API communication
+reqwest = { workspace = true, features = ["json"] }
+
+# Serialization
+serde = { workspace = true }
+serde_json = { workspace = true }
+
+# TUI framework
+ratatui = "0.29"
+crossterm = { version = "0.28", features = ["event-stream"] }
+
+# Error handling
+anyhow = { workspace = true }
+thiserror = { workspace = true }
+
+# Logging
+tracing = { workspace = true }
+tracing-subscriber = { workspace = true }
+
+# UUID handling
+uuid = { version = "1.0", features = ["v4", "serde"] }
+
+# Date/time
+chrono = { version = "0.4", features = ["serde"] }
+
+# CLI argument parsing
+clap = { version = "4.5", features = ["derive"] }
+
+# Async streams
+futures-util = "0.3"
+tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
+
+# URL handling
+url = "2.5"
+
+[lints.clippy]
+uninlined-format-args = "allow"
