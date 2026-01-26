@@ -13,7 +13,10 @@ use crossterm::{
 use ratatui::{Terminal, backend::CrosstermBackend};
 use tracing_subscriber::{EnvFilter, fmt, layer::SubscriberExt, util::SubscriberInitExt};
 
-use vibe_kanban_cli::{App, VibeKanbanClient, app::{InputMode, View}};
+use vibe_kanban_cli::{
+    App, VibeKanbanClient,
+    app::{InputMode, View},
+};
 
 /// Vibe Kanban CLI - Interactive terminal interface
 #[derive(Parser, Debug)]
@@ -31,6 +34,11 @@ struct Args {
 
 #[tokio::main]
 async fn main() -> Result<()> {
+    // Install rustls crypto provider before any TLS operations
+    rustls::crypto::aws_lc_rs::default_provider()
+        .install_default()
+        .expect("Failed to install rustls crypto provider");
+
     let args = Args::parse();
 
     // Initialize logging
@@ -42,8 +50,7 @@ async fn main() -> Result<()> {
     }
 
     // Create API client
-    let client = VibeKanbanClient::new(&args.server)
-        .context("Failed to create API client")?;
+    let client = VibeKanbanClient::new(&args.server).context("Failed to create API client")?;
 
     // Check server health
     if !client.health_check().await.unwrap_or(false) {
@@ -95,8 +102,7 @@ async fn run_app<B: ratatui::backend::Backend>(
         if event::poll(Duration::from_millis(100))? {
             if let Event::Key(key) = event::read()? {
                 // Handle Ctrl+C globally
-                if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c')
-                {
+                if key.modifiers.contains(KeyModifiers::CONTROL) && key.code == KeyCode::Char('c') {
                     app.should_quit = true;
                 }
 
@@ -162,10 +168,18 @@ async fn handle_normal_input(app: &mut App, key: KeyCode) -> Result<()> {
 
         // Navigation
         KeyCode::Up | KeyCode::Char('k') => {
-            app.move_up();
+            if app.view == View::CreateAttempt {
+                handle_create_attempt_navigation(app, -1);
+            } else {
+                app.move_up();
+            }
         }
         KeyCode::Down | KeyCode::Char('j') => {
-            app.move_down();
+            if app.view == View::CreateAttempt {
+                handle_create_attempt_navigation(app, 1);
+            } else {
+                app.move_down();
+            }
         }
         KeyCode::Left | KeyCode::Char('h') => {
             app.move_left();
@@ -173,10 +187,19 @@ async fn handle_normal_input(app: &mut App, key: KeyCode) -> Result<()> {
         KeyCode::Right | KeyCode::Char('l') => {
             app.move_right();
         }
+        KeyCode::Tab => {
+            if app.view == View::CreateAttempt {
+                handle_create_attempt_tab(app);
+            }
+        }
 
         // View-specific keys
         KeyCode::Enter => {
-            handle_enter(app).await?;
+            if app.view == View::CreateAttempt {
+                handle_create_attempt_enter(app).await?;
+            } else {
+                handle_enter(app).await?;
+            }
         }
         KeyCode::Char('n') => {
             handle_new(app).await?;
@@ -205,7 +228,11 @@ async fn handle_normal_input(app: &mut App, key: KeyCode) -> Result<()> {
 async fn handle_editing_input(app: &mut App, key: KeyCode) -> Result<()> {
     match key {
         KeyCode::Esc => {
-            app.input_mode = InputMode::Normal;
+            if app.view == View::CreateAttempt {
+                app.input_mode = InputMode::Normal;
+            } else {
+                app.input_mode = InputMode::Normal;
+            }
         }
         KeyCode::Enter => {
             if app.view == View::CreateTask {
@@ -213,16 +240,58 @@ async fn handle_editing_input(app: &mut App, key: KeyCode) -> Result<()> {
                     app.set_error(format!("Failed to create task: {}", e));
                 }
                 app.input_mode = InputMode::Normal;
+            } else if app.view == View::CreateAttempt {
+                if app.attempt_selected_field == 1 {
+                    // Variant field - create attempt
+                    if let Err(e) = app.create_attempt().await {
+                        app.set_error(format!("Failed to create attempt: {}", e));
+                    }
+                } else if app.attempt_selected_field >= 2 {
+                    // Branch field - finish editing
+                    app.input_mode = InputMode::Normal;
+                }
             }
         }
         KeyCode::Backspace => {
             if app.view == View::CreateTask {
                 app.new_task_title.pop();
+            } else if app.view == View::CreateAttempt {
+                if app.attempt_selected_field == 1 {
+                    // Variant field
+                    if let Some(ref mut variant) = app.attempt_variant {
+                        variant.pop();
+                        if variant.is_empty() {
+                            app.attempt_variant = None;
+                        }
+                    }
+                } else if app.attempt_selected_field >= 2 {
+                    // Branch field
+                    let repo_index = app.attempt_selected_field - 2;
+                    if repo_index < app.attempt_repo_branches.len() {
+                        app.attempt_repo_branches[repo_index].1.pop();
+                    }
+                }
             }
         }
         KeyCode::Char(c) => {
             if app.view == View::CreateTask {
                 app.new_task_title.push(c);
+            } else if app.view == View::CreateAttempt {
+                if app.attempt_selected_field == 1 {
+                    // Variant field
+                    if app.attempt_variant.is_none() {
+                        app.attempt_variant = Some(String::new());
+                    }
+                    if let Some(ref mut variant) = app.attempt_variant {
+                        variant.push(c);
+                    }
+                } else if app.attempt_selected_field >= 2 {
+                    // Branch field
+                    let repo_index = app.attempt_selected_field - 2;
+                    if repo_index < app.attempt_repo_branches.len() {
+                        app.attempt_repo_branches[repo_index].1.push(c);
+                    }
+                }
             }
         }
         _ => {}
@@ -250,6 +319,9 @@ async fn handle_enter(app: &mut App) -> Result<()> {
         View::CreateTask => {
             app.input_mode = InputMode::Editing;
         }
+        View::CreateAttempt => {
+            // Handled in handle_create_attempt_enter
+        }
         View::Help => {
             app.go_back();
         }
@@ -263,6 +335,15 @@ async fn handle_new(app: &mut App) -> Result<()> {
         View::Tasks => {
             app.navigate_to(View::CreateTask);
             app.input_mode = InputMode::Editing;
+        }
+        View::Workspaces => {
+            if app.selected_task.is_some() {
+                if let Err(e) = app.init_create_attempt().await {
+                    app.set_error(format!("Failed to initialize: {}", e));
+                } else {
+                    app.navigate_to(View::CreateAttempt);
+                }
+            }
         }
         _ => {}
     }
@@ -345,6 +426,87 @@ async fn handle_stop(app: &mut App) -> Result<()> {
             }
         }
         _ => {}
+    }
+    Ok(())
+}
+
+// =========================================================================
+// Create Attempt Handlers
+// =========================================================================
+
+fn handle_create_attempt_navigation(app: &mut App, delta: i32) {
+    match app.attempt_selected_field {
+        0 => {
+            // Executor selection
+            let executors = App::available_executors();
+            let new_index = (app.attempt_executor_index as i32 + delta)
+                .max(0)
+                .min(executors.len() as i32 - 1) as usize;
+            app.attempt_executor_index = new_index;
+        }
+        1 => {
+            // Variant field - can't navigate up/down, use Tab
+        }
+        _ => {
+            // Repo branch selection
+            let repo_index = app.attempt_selected_field - 2;
+            if repo_index < app.attempt_repo_branches.len() {
+                let (repo_id, current_branch) = &app.attempt_repo_branches[repo_index];
+
+                // Find branches for this repo
+                if let Some((_, branches)) = app
+                    .repo_branches_cache
+                    .iter()
+                    .find(|(id, _)| *id == *repo_id)
+                {
+                    if let Some(current_pos) =
+                        branches.iter().position(|b| b.name == *current_branch)
+                    {
+                        let new_pos = (current_pos as i32 + delta)
+                            .max(0)
+                            .min(branches.len() as i32 - 1)
+                            as usize;
+                        if let Some(new_branch) = branches.get(new_pos) {
+                            app.attempt_repo_branches[repo_index].1 = new_branch.name.clone();
+                        }
+                    } else if !branches.is_empty() {
+                        // Current branch not in list, select first
+                        app.attempt_repo_branches[repo_index].1 = branches[0].name.clone();
+                    }
+                }
+            }
+        }
+    }
+}
+
+fn handle_create_attempt_tab(app: &mut App) {
+    let max_field = 1 + app.attempt_repo_branches.len(); // executor + variant + repos
+    app.attempt_selected_field = (app.attempt_selected_field + 1) % max_field;
+
+    // If moving to variant field, enter editing mode
+    if app.attempt_selected_field == 1 {
+        app.input_mode = InputMode::Editing;
+    } else {
+        app.input_mode = InputMode::Normal;
+    }
+}
+
+async fn handle_create_attempt_enter(app: &mut App) -> Result<()> {
+    match app.attempt_selected_field {
+        0 => {
+            // Executor selected - move to variant
+            handle_create_attempt_tab(app);
+        }
+        1 => {
+            // Variant field - create attempt
+            if let Err(e) = app.create_attempt().await {
+                app.set_error(format!("Failed to create attempt: {}", e));
+            }
+        }
+        _ => {
+            // Repo branch selected - allow editing branch name
+            app.input_mode = InputMode::Editing;
+        }
     }
     Ok(())
 }

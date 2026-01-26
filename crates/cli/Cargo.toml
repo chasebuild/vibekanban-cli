@@ -44,5 +44,8 @@ tokio-tungstenite = { version = "0.26", features = ["rustls-tls-webpki-roots"] }
 # URL handling
 url = "2.5"
 
+# TLS crypto provider (required for reqwest with rustls)
+rustls = { workspace = true }
+
 [lints.clippy]
 uninlined-format-args = "allow"

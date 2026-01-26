@@ -17,6 +17,7 @@ pub fn render(frame: &mut Frame, app: &App) {
         View::Workspaces => views::workspaces::render(frame, app),
         View::WorkspaceDetail => views::workspace_detail::render(frame, app),
         View::CreateTask => views::create_task::render(frame, app),
+        View::CreateAttempt => views::create_attempt::render(frame, app),
         View::Help => views::help::render(frame, app),
     }
 }

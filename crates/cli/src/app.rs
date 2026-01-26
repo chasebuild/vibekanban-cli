@@ -17,6 +17,7 @@ pub enum View {
     Workspaces,
     WorkspaceDetail,
     CreateTask,
+    CreateAttempt,
     Help,
 }
 
@@ -122,6 +123,13 @@ pub struct App {
 
     // Follow-up input
     pub follow_up_input: String,
+
+    // Create attempt form
+    pub attempt_executor_index: usize,
+    pub attempt_variant: Option<String>,
+    pub attempt_repo_branches: Vec<(Uuid, String)>, // (repo_id, branch_name)
+    pub attempt_selected_field: usize, // 0=executor, 1=variant, 2+=repo branches
+    pub repo_branches_cache: Vec<(Uuid, Vec<crate::types::GitBranch>)>, // (repo_id, branches)
 }
 
 impl App {
@@ -159,6 +167,12 @@ impl App {
             new_task_description: String::new(),
 
             follow_up_input: String::new(),
+
+            attempt_executor_index: 0,
+            attempt_variant: None,
+            attempt_repo_branches: Vec::new(),
+            attempt_selected_field: 0,
+            repo_branches_cache: Vec::new(),
         }
     }
 
@@ -434,6 +448,112 @@ impl App {
             self.load_workspace_details().await?;
             self.set_status("Rebased successfully");
         }
+        Ok(())
+    }
+
+    // =========================================================================
+    // Attempt Creation
+    // =========================================================================
+
+    /// Initialize the create attempt form.
+    pub async fn init_create_attempt(&mut self) -> Result<()> {
+        // Reset form state
+        self.attempt_executor_index = 0;
+        self.attempt_variant = None;
+        self.attempt_repo_branches.clear();
+        self.attempt_selected_field = 0;
+        self.repo_branches_cache.clear();
+
+        // Load branches for all repos
+        if let Some(project_id) = self.selected_project.as_ref().map(|p| p.id) {
+            self.set_status("Loading branches...");
+            let repos = self.client.get_project_repositories(project_id).await?;
+            
+            for repo in repos {
+                match self.client.get_repo_branches(repo.id).await {
+                    Ok(branches) => {
+                        self.repo_branches_cache.push((repo.id, branches.clone()));
+                        // Initialize with first branch (or main/master if available)
+                        let default_branch = branches
+                            .iter()
+                            .find(|b| b.name == "main" || b.name == "master")
+                            .map(|b| b.name.clone())
+                            .or_else(|| branches.first().map(|b| b.name.clone()))
+                            .unwrap_or_else(|| "main".to_string());
+                        self.attempt_repo_branches.push((repo.id, default_branch));
+                    }
+                    Err(e) => {
+                        self.set_error(format!("Failed to load branches for {}: {}", repo.name, e));
+                        // Still add repo with empty branch
+                        self.attempt_repo_branches.push((repo.id, "main".to_string()));
+                    }
+                }
+            }
+            self.clear_messages();
+        }
+        Ok(())
+    }
+
+    /// Get available executors list.
+    pub fn available_executors() -> Vec<crate::types::BaseCodingAgent> {
+        vec![
+            crate::types::BaseCodingAgent::CursorAgent,
+            crate::types::BaseCodingAgent::ClaudeCode,
+            crate::types::BaseCodingAgent::Gemini,
+            crate::types::BaseCodingAgent::Codex,
+            crate::types::BaseCodingAgent::Opencode,
+            crate::types::BaseCodingAgent::QwenCode,
+            crate::types::BaseCodingAgent::Amp,
+            crate::types::BaseCodingAgent::Copilot,
+            crate::types::BaseCodingAgent::Droid,
+        ]
+    }
+
+    /// Create a new attempt for the selected task.
+    pub async fn create_attempt(&mut self) -> Result<()> {
+        let task_id = self.selected_task.as_ref().map(|t| t.task.id);
+        if task_id.is_none() {
+            self.set_error("No task selected");
+            return Ok(());
+        }
+
+        if self.attempt_repo_branches.is_empty() {
+            self.set_error("No repositories configured for this project");
+            return Ok(());
+        }
+
+        let executors = Self::available_executors();
+        if self.attempt_executor_index >= executors.len() {
+            self.set_error("Invalid executor selection");
+            return Ok(());
+        }
+
+        let executor = executors[self.attempt_executor_index];
+        let executor_profile_id = crate::types::ExecutorProfileId {
+            executor,
+            variant: self.attempt_variant.clone(),
+        };
+
+        let repos: Vec<crate::types::WorkspaceRepoInput> = self
+            .attempt_repo_branches
+            .iter()
+            .map(|(repo_id, branch)| crate::types::WorkspaceRepoInput {
+                repo_id: *repo_id,
+                target_branch: branch.clone(),
+            })
+            .collect();
+
+        self.set_status("Creating attempt...");
+        let payload = crate::types::CreateTaskAttemptBody {
+            task_id: task_id.unwrap(),
+            executor_profile_id,
+            repos,
+        };
+
+        self.client.create_task_attempt(&payload).await?;
+        self.load_workspaces().await?;
+        self.set_status("Attempt created successfully");
+        self.go_back();
         Ok(())
     }
 

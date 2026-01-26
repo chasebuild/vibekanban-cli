@@ -1,5 +1,6 @@
 //! View modules for different screens.
 
+pub mod create_attempt;
 pub mod create_task;
 pub mod help;
 pub mod projects;
