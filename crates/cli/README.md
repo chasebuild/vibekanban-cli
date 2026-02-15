@@ -14,3 +14,14 @@ cargo install vibe-kanban-cli
 vibe-kanban-cli --help
 ```
 
+## Start the server (background)
+
+```bash
+vibe-kanban-cli server start --background
+```
+
+If you need a custom command, pass `--command`:
+
+```bash
+vibe-kanban-cli server start --background --command "cargo run --bin server"
+```

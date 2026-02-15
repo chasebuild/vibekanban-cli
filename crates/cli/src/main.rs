@@ -15,7 +15,7 @@ use vibe_kanban_cli::{
 };
 
 use crate::{
-    cli_args::{Args, Command},
+    cli_args::{Args, Command, ServerCommand},
     resolve::{parse_uuid, resolve_project, resolve_repo_inputs},
     utils::{truncate_title},
     watch::{WatchFilter, watch_tasks},
@@ -129,9 +129,61 @@ async fn main() -> Result<()> {
 
             watch_tasks(&client, &args.server, filter, project).await?;
         }
+        Command::Server { command } => match command {
+            ServerCommand::Start {
+                command,
+                background,
+                log,
+            } => {
+                start_server(&command, background, &log)?;
+            }
+        },
     }
 
     Ok(())
+}
+
+fn start_server(command: &str, background: bool, log_path: &str) -> Result<()> {
+    use std::fs::OpenOptions;
+    use std::process::{Command, Stdio};
+
+    if background {
+        let log_file = OpenOptions::new()
+            .create(true)
+            .append(true)
+            .open(log_path)
+            .with_context(|| format!("Failed to open log file {}", log_path))?;
+
+        let mut child = Command::new("bash")
+            .arg("-lc")
+            .arg(command)
+            .stdin(Stdio::null())
+            .stdout(log_file.try_clone()?)
+            .stderr(log_file)
+            .spawn()
+            .with_context(|| format!("Failed to start server with '{}'", command))?;
+
+        println!(
+            "Server started in background (pid: {}). Logs: {}",
+            child.id(),
+            log_path
+        );
+        Ok(())
+    } else {
+        let status = Command::new("bash")
+            .arg("-lc")
+            .arg(command)
+            .stdin(Stdio::inherit())
+            .stdout(Stdio::inherit())
+            .stderr(Stdio::inherit())
+            .status()
+            .with_context(|| format!("Failed to start server with '{}'", command))?;
+
+        if !status.success() {
+            return Err(anyhow!("Server exited with status: {}", status));
+        }
+        Ok(())
+    }
 }
 
 fn parse_executor(input: &str) -> Result<vibe_kanban_cli::types::BaseCodingAgent> {

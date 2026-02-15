@@ -73,4 +73,25 @@ pub enum Command {
         #[arg(long)]
         slug: Option<String>,
     },
+    /// Manage a local Vibe Kanban server process
+    Server {
+        #[command(subcommand)]
+        command: ServerCommand,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ServerCommand {
+    /// Start the server (optionally in the background)
+    Start {
+        /// Command to launch the server
+        #[arg(long, default_value = "pnpm run dev")]
+        command: String,
+        /// Run in the background
+        #[arg(long)]
+        background: bool,
+        /// Log file path (used only when --background is set)
+        #[arg(long, default_value = "vibe-kanban-server.log")]
+        log: String,
+    },
 }
