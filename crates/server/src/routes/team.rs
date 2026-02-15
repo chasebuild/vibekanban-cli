@@ -1,9 +1,8 @@
-//! Swarm Management API Routes
+//! Team Management API Routes
 //!
-//! Provides endpoints for managing agent swarm executions, including:
-//! - Creating and managing swarm executions
+//! Provides endpoints for managing agent teams, including:
+//! - Creating and managing team executions
 //! - Task planning and decomposition
-//! - Consensus review management
 //! - Agent skill and profile management
 
 use axum::{
@@ -14,12 +13,10 @@ use axum::{
 use db::models::{
     agent_profile::{AgentProfile, CreateAgentProfile, UpdateAgentProfile},
     agent_skill::{AgentSkill, CreateAgentSkill, UpdateAgentSkill},
-    consensus_review::{ConsensusReview, ConsensusSummary, SubmitReviewVote},
-    swarm_execution::{SwarmExecution, SwarmPlanOutput},
-    swarm_task::{SwarmProgress, SwarmTask},
+    team_execution::{TeamExecution, TeamPlanOutput},
+    team_task::{TeamProgress, TeamTask},
     task::Task,
 };
-use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use sqlx::Error as SqlxError;
 use ts_rs::TS;
@@ -30,66 +27,42 @@ use crate::{DeploymentImpl, error::ApiError};
 // ============== Request/Response Types ==============
 
 #[derive(Debug, Deserialize, TS)]
-pub struct CreateSwarmExecutionRequest {
+pub struct CreateTeamExecutionRequest {
     pub epic_task_id: Uuid,
     pub workspace_id: Option<Uuid>,
-    pub reviewer_count: Option<i32>,
     pub max_parallel_workers: Option<i32>,
 }
 
 #[derive(Debug, Serialize, TS)]
-pub struct SwarmExecutionResponse {
-    pub execution: SwarmExecution,
-    pub tasks: Vec<SwarmTask>,
-    pub progress: SwarmProgress,
+pub struct TeamExecutionResponse {
+    pub execution: TeamExecution,
+    pub tasks: Vec<TeamTask>,
+    pub progress: TeamProgress,
 }
 
 #[derive(Debug, Serialize, TS)]
-pub struct SwarmPlanResponse {
-    pub execution: SwarmExecution,
-    pub plan: SwarmPlanOutput,
-}
-
-#[derive(Debug, Deserialize, TS)]
-pub struct ExecutePlanRequest {
-    pub swarm_execution_id: Uuid,
-}
-
-#[derive(Debug, Serialize, TS)]
-pub struct ConsensusStatusResponse {
-    pub execution: SwarmExecution,
-    pub reviews: Vec<ConsensusReview>,
-    pub summary: ConsensusSummary,
-}
-
-#[derive(Debug, Deserialize, TS)]
-pub struct SubmitVoteRequest {
-    pub review_id: Uuid,
-    pub vote: SubmitReviewVote,
+pub struct TeamPlanResponse {
+    pub execution: TeamExecution,
+    pub plan: TeamPlanOutput,
 }
 
 // ============== Routes ==============
 
 pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
     Router::new()
-        // Swarm Execution routes
-        .route("/swarms", post(create_swarm_execution))
-        .route("/swarms/{id}", get(get_swarm_execution))
-        .route("/swarms/{id}/plan", post(generate_plan))
-        .route("/swarms/{id}/execute", post(execute_plan))
-        .route("/swarms/{id}/progress", get(get_progress))
-        .route("/swarms/{id}/pause", post(pause_execution))
-        .route("/swarms/{id}/resume", post(resume_execution))
-        .route("/swarms/{id}/cancel", post(cancel_execution))
-        // Swarm Tasks routes
-        .route("/swarms/{id}/tasks", get(get_swarm_tasks))
-        .route("/swarms/tasks/{task_id}/complete", post(complete_task))
-        .route("/swarms/tasks/{task_id}/fail", post(fail_task))
-        // Consensus routes
-        .route("/swarms/{id}/consensus", get(get_consensus_status))
-        .route("/swarms/{id}/consensus/start", post(start_consensus))
-        .route("/swarms/{id}/consensus/vote", post(submit_vote))
-        .route("/swarms/{id}/consensus/finalize", post(finalize_consensus))
+        // Team Execution routes
+        .route("/teams", post(create_team_execution))
+        .route("/teams/{id}", get(get_team_execution))
+        .route("/teams/{id}/plan", post(generate_plan))
+        .route("/teams/{id}/execute", post(execute_plan))
+        .route("/teams/{id}/progress", get(get_progress))
+        .route("/teams/{id}/pause", post(pause_execution))
+        .route("/teams/{id}/resume", post(resume_execution))
+        .route("/teams/{id}/cancel", post(cancel_execution))
+        // Team Tasks routes
+        .route("/teams/{id}/tasks", get(get_team_tasks))
+        .route("/teams/tasks/{task_id}/complete", post(complete_task))
+        .route("/teams/tasks/{task_id}/fail", post(fail_task))
         // Agent Skills routes
         .route("/agent-skills", get(list_skills).post(create_skill))
         .route(
@@ -112,12 +85,12 @@ pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
         .route("/tasks/{task_id}/set-epic", post(set_task_epic))
 }
 
-// ============== Swarm Execution Handlers ==============
+// ============== Team Execution Handlers ==============
 
-async fn create_swarm_execution(
+async fn create_team_execution(
     State(deployment): State<DeploymentImpl>,
-    Json(req): Json<CreateSwarmExecutionRequest>,
-) -> Result<Json<SwarmExecution>, ApiError> {
+    Json(req): Json<CreateTeamExecutionRequest>,
+) -> Result<Json<TeamExecution>, ApiError> {
     let pool = &deployment.db().pool;
 
     // Verify task exists and is epic
@@ -130,29 +103,29 @@ async fn create_swarm_execution(
         Task::set_epic(pool, req.epic_task_id, true).await?;
     }
 
-    let planner = services::services::swarm::PlannerService::new(pool.clone());
+    let planner = services::services::team::PlannerService::new(pool.clone());
     let execution = planner
-        .create_swarm_execution(req.epic_task_id, req.workspace_id)
+        .create_team_execution(req.epic_task_id, req.workspace_id, req.max_parallel_workers)
         .await
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
     Ok(Json(execution))
 }
 
-async fn get_swarm_execution(
+async fn get_team_execution(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<SwarmExecutionResponse>, ApiError> {
+) -> Result<Json<TeamExecutionResponse>, ApiError> {
     let pool = &deployment.db().pool;
 
-    let execution = SwarmExecution::find_by_id(pool, id)
+    let execution = TeamExecution::find_by_id(pool, id)
         .await?
         .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
-    let tasks = SwarmTask::find_by_swarm_execution(pool, id).await?;
-    let progress = SwarmTask::get_progress(pool, id).await?;
+    let tasks = TeamTask::find_by_team_execution(pool, id).await?;
+    let progress = TeamTask::get_progress(pool, id).await?;
 
-    Ok(Json(SwarmExecutionResponse {
+    Ok(Json(TeamExecutionResponse {
         execution,
         tasks,
         progress,
@@ -162,39 +135,39 @@ async fn get_swarm_execution(
 async fn generate_plan(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<SwarmPlanResponse>, ApiError> {
+) -> Result<Json<TeamPlanResponse>, ApiError> {
     let pool = &deployment.db().pool;
-    let planner = services::services::swarm::PlannerService::new(pool.clone());
+    let planner = services::services::team::PlannerService::new(pool.clone());
 
     let plan = planner
         .generate_plan(id)
         .await
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    let execution = SwarmExecution::find_by_id(pool, id)
+    let execution = TeamExecution::find_by_id(pool, id)
         .await?
         .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
-    Ok(Json(SwarmPlanResponse { execution, plan }))
+    Ok(Json(TeamPlanResponse { execution, plan }))
 }
 
 async fn execute_plan(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<Vec<SwarmTask>>, ApiError> {
+) -> Result<Json<Vec<TeamTask>>, ApiError> {
     let pool = &deployment.db().pool;
 
-    let execution = SwarmExecution::find_by_id(pool, id)
+    let execution = TeamExecution::find_by_id(pool, id)
         .await?
         .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
-    let plan: SwarmPlanOutput = execution
+    let plan: TeamPlanOutput = execution
         .planner_output
         .as_ref()
         .ok_or_else(|| ApiError::BadRequest("No plan generated yet".into()))
         .and_then(|p| serde_json::from_str(p).map_err(|e| ApiError::BadRequest(e.to_string())))?;
 
-    let planner = services::services::swarm::PlannerService::new(pool.clone());
+    let planner = services::services::team::PlannerService::new(pool.clone());
     let tasks = planner
         .execute_plan(id, &plan)
         .await
@@ -206,25 +179,25 @@ async fn execute_plan(
 async fn get_progress(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<SwarmProgress>, ApiError> {
+) -> Result<Json<TeamProgress>, ApiError> {
     let pool = &deployment.db().pool;
-    let progress = SwarmTask::get_progress(pool, id).await?;
+    let progress = TeamTask::get_progress(pool, id).await?;
     Ok(Json(progress))
 }
 
 async fn pause_execution(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<SwarmExecution>, ApiError> {
+) -> Result<Json<TeamExecution>, ApiError> {
     let pool = &deployment.db().pool;
-    let manager = services::services::swarm::SwarmManager::new(pool.clone());
+    let manager = services::services::team::TeamManager::new(pool.clone());
 
     manager
         .pause_execution(id)
         .await
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    let execution = SwarmExecution::find_by_id(pool, id)
+    let execution = TeamExecution::find_by_id(pool, id)
         .await?
         .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
@@ -234,16 +207,16 @@ async fn pause_execution(
 async fn resume_execution(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<SwarmExecution>, ApiError> {
+) -> Result<Json<TeamExecution>, ApiError> {
     let pool = &deployment.db().pool;
-    let manager = services::services::swarm::SwarmManager::new(pool.clone());
+    let manager = services::services::team::TeamManager::new(pool.clone());
 
     manager
         .resume_execution(id)
         .await
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    let execution = SwarmExecution::find_by_id(pool, id)
+    let execution = TeamExecution::find_by_id(pool, id)
         .await?
         .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
@@ -253,46 +226,46 @@ async fn resume_execution(
 async fn cancel_execution(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<SwarmExecution>, ApiError> {
+) -> Result<Json<TeamExecution>, ApiError> {
     let pool = &deployment.db().pool;
-    let manager = services::services::swarm::SwarmManager::new(pool.clone());
+    let manager = services::services::team::TeamManager::new(pool.clone());
 
     manager
         .cancel_execution(id)
         .await
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    let execution = SwarmExecution::find_by_id(pool, id)
+    let execution = TeamExecution::find_by_id(pool, id)
         .await?
         .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     Ok(Json(execution))
 }
 
-// ============== Swarm Tasks Handlers ==============
+// ============== Team Tasks Handlers ==============
 
-async fn get_swarm_tasks(
+async fn get_team_tasks(
     State(deployment): State<DeploymentImpl>,
     Path(id): Path<Uuid>,
-) -> Result<Json<Vec<SwarmTask>>, ApiError> {
+) -> Result<Json<Vec<TeamTask>>, ApiError> {
     let pool = &deployment.db().pool;
-    let tasks = SwarmTask::find_by_swarm_execution(pool, id).await?;
+    let tasks = TeamTask::find_by_team_execution(pool, id).await?;
     Ok(Json(tasks))
 }
 
 async fn complete_task(
     State(deployment): State<DeploymentImpl>,
     Path(task_id): Path<Uuid>,
-) -> Result<Json<SwarmTask>, ApiError> {
+) -> Result<Json<TeamTask>, ApiError> {
     let pool = &deployment.db().pool;
-    let manager = services::services::swarm::SwarmManager::new(pool.clone());
+    let manager = services::services::team::TeamManager::new(pool.clone());
 
     manager
         .complete_task(task_id)
         .await
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    let task = SwarmTask::find_by_id(pool, task_id)
+    let task = TeamTask::find_by_id(pool, task_id)
         .await?
         .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
@@ -308,100 +281,20 @@ async fn fail_task(
     State(deployment): State<DeploymentImpl>,
     Path(task_id): Path<Uuid>,
     Json(req): Json<FailTaskRequest>,
-) -> Result<Json<SwarmTask>, ApiError> {
+) -> Result<Json<TeamTask>, ApiError> {
     let pool = &deployment.db().pool;
-    let manager = services::services::swarm::SwarmManager::new(pool.clone());
+    let manager = services::services::team::TeamManager::new(pool.clone());
 
     manager
         .fail_task(task_id, &req.error)
         .await
         .map_err(|e| ApiError::BadRequest(e.to_string()))?;
 
-    let task = SwarmTask::find_by_id(pool, task_id)
+    let task = TeamTask::find_by_id(pool, task_id)
         .await?
         .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
 
     Ok(Json(task))
-}
-
-// ============== Consensus Handlers ==============
-
-async fn get_consensus_status(
-    State(deployment): State<DeploymentImpl>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<ConsensusStatusResponse>, ApiError> {
-    let pool = &deployment.db().pool;
-    let consensus = services::services::swarm::ConsensusService::new(pool.clone());
-
-    let execution = SwarmExecution::find_by_id(pool, id)
-        .await?
-        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
-
-    let reviews = consensus
-        .get_reviews(id)
-        .await
-        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
-
-    let summary = consensus
-        .get_summary(id)
-        .await
-        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
-
-    Ok(Json(ConsensusStatusResponse {
-        execution,
-        reviews,
-        summary,
-    }))
-}
-
-async fn start_consensus(
-    State(deployment): State<DeploymentImpl>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<Vec<ConsensusReview>>, ApiError> {
-    let pool = &deployment.db().pool;
-    let consensus = services::services::swarm::ConsensusService::new(pool.clone());
-
-    let reviews = consensus
-        .start_review(id)
-        .await
-        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
-
-    Ok(Json(reviews))
-}
-
-async fn submit_vote(
-    State(deployment): State<DeploymentImpl>,
-    Path(_id): Path<Uuid>,
-    Json(req): Json<SubmitVoteRequest>,
-) -> Result<Json<ConsensusReview>, ApiError> {
-    let pool = &deployment.db().pool;
-    let consensus = services::services::swarm::ConsensusService::new(pool.clone());
-
-    let review = consensus
-        .submit_vote(req.review_id, &req.vote)
-        .await
-        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
-
-    Ok(Json(review))
-}
-
-async fn finalize_consensus(
-    State(deployment): State<DeploymentImpl>,
-    Path(id): Path<Uuid>,
-) -> Result<Json<SwarmExecution>, ApiError> {
-    let pool = &deployment.db().pool;
-    let consensus = services::services::swarm::ConsensusService::new(pool.clone());
-
-    consensus
-        .finalize_consensus(id)
-        .await
-        .map_err(|e| ApiError::BadRequest(e.to_string()))?;
-
-    let execution = SwarmExecution::find_by_id(pool, id)
-        .await?
-        .ok_or_else(|| ApiError::Database(SqlxError::RowNotFound))?;
-
-    Ok(Json(execution))
 }
 
 // ============== Agent Skills Handlers ==============

@@ -1,4 +1,4 @@
-import { SwarmTask, SwarmTaskStatus } from '../../../shared/types';
+import { TeamTask, TeamTaskStatus } from '../../../shared/types';
 import { Badge } from '../ui/badge';
 import {
   CheckCircle,
@@ -10,12 +10,12 @@ import {
   AlertCircle,
 } from 'lucide-react';
 
-interface SwarmTaskListProps {
-  tasks: SwarmTask[];
-  onTaskClick?: (task: SwarmTask) => void;
+interface TeamTaskListProps {
+  tasks: TeamTask[];
+  onTaskClick?: (task: TeamTask) => void;
 }
 
-const statusIcons: Record<SwarmTaskStatus, React.ReactNode> = {
+const statusIcons: Record<TeamTaskStatus, React.ReactNode> = {
   pending: <Circle className="h-4 w-4 text-gray-400" />,
   blocked: <Clock className="h-4 w-4 text-yellow-500" />,
   assigned: <AlertCircle className="h-4 w-4 text-blue-400" />,
@@ -25,7 +25,7 @@ const statusIcons: Record<SwarmTaskStatus, React.ReactNode> = {
   skipped: <SkipForward className="h-4 w-4 text-gray-500" />,
 };
 
-const statusLabels: Record<SwarmTaskStatus, string> = {
+const statusLabels: Record<TeamTaskStatus, string> = {
   pending: 'Pending',
   blocked: 'Blocked',
   assigned: 'Assigned',
@@ -35,7 +35,7 @@ const statusLabels: Record<SwarmTaskStatus, string> = {
   skipped: 'Skipped',
 };
 
-export function SwarmTaskList({ tasks, onTaskClick }: SwarmTaskListProps) {
+export function TeamTaskList({ tasks, onTaskClick }: TeamTaskListProps) {
   // Sort tasks by sequence order
   const sortedTasks = [...tasks].sort(
     (a, b) => a.sequence_order - b.sequence_order
@@ -120,7 +120,7 @@ export function SwarmTaskList({ tasks, onTaskClick }: SwarmTaskListProps) {
 
       {tasks.length === 0 && (
         <div className="text-center py-8 text-muted-foreground">
-          No tasks in this swarm execution
+          No tasks in this team execution
         </div>
       )}
     </div>

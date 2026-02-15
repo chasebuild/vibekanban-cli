@@ -50,7 +50,7 @@ import type {
 } from 'shared/types';
 
 // Execution mode type
-type ExecutionMode = 'single' | 'swarm';
+type ExecutionMode = 'single' | 'team';
 
 interface TaskRow {
   id: string;
@@ -478,18 +478,17 @@ export function QuickTaskInput({
   const [submittingCount, setSubmittingCount] = useState(0);
   const [newRowId, setNewRowId] = useState<string | null>(null);
   
-  // Agent Swarm mode state
+  // Agent Team mode state
   const [executionMode, setExecutionMode] = useState<ExecutionMode>('single');
   const [maxParallelWorkers, setMaxParallelWorkers] = useState(3);
-  const [reviewerCount, setReviewerCount] = useState(3);
   
-  const isSwarmMode = executionMode === 'swarm';
+  const isTeamMode = executionMode === 'team';
   
-  // When swarm mode is selected, force autoStart to be true
-  // (swarm mode doesn't make sense without starting execution)
+  // When team mode is selected, force autoStart to be true
+  // (team mode doesn't make sense without starting execution)
   const handleExecutionModeChange = useCallback((mode: ExecutionMode) => {
     setExecutionMode(mode);
-    if (mode === 'swarm') {
+    if (mode === 'team') {
       setAutoStart(true);
     }
   }, []);
@@ -497,10 +496,10 @@ export function QuickTaskInput({
   // When autoStart is toggled off, reset to single mode
   const handleAutoStartChange = useCallback((checked: boolean) => {
     setAutoStart(checked);
-    if (!checked && isSwarmMode) {
+    if (!checked && isTeamMode) {
       setExecutionMode('single');
     }
-  }, [isSwarmMode]);
+  }, [isTeamMode]);
 
   // Set default executor profile when config loads
   useEffect(() => {
@@ -555,29 +554,29 @@ export function QuickTaskInput({
 
   const isSubmitting = submittingCount > 0;
   
-  // In swarm mode, autoStart is always effectively true
-  const effectiveAutoStart = isSwarmMode ? true : autoStart;
+  // In team mode, autoStart is always effectively true
+  const effectiveAutoStart = isTeamMode ? true : autoStart;
 
   const validRows = useMemo(() => {
     return rows.filter((row) => {
       if (!row.prompt.trim()) return false;
       // In single agent mode with autostart, we need a branch
-      // In swarm mode, branch is still used but we use the default branch if not set
-      if (effectiveAutoStart && !isSwarmMode && !row.branch) return false;
+      // In team mode, branch is still used but we use the default branch if not set
+      if (effectiveAutoStart && !isTeamMode && !row.branch) return false;
       return true;
     });
-  }, [rows, effectiveAutoStart, isSwarmMode]);
+  }, [rows, effectiveAutoStart, isTeamMode]);
 
   const canSubmit = useMemo(() => {
     if (validRows.length === 0) return false;
-    // In swarm mode, we don't need an executor profile - the swarm manages execution
-    if (effectiveAutoStart && !isSwarmMode && !executorProfileId) return false;
+    // In team mode, we don't need an executor profile - the team manages execution
+    if (effectiveAutoStart && !isTeamMode && !executorProfileId) return false;
     // In single agent mode with autostart, we need a repo
-    if (effectiveAutoStart && !isSwarmMode && !repoId) return false;
-    // In swarm mode, we need a repo for the workers
-    if (isSwarmMode && !repoId) return false;
+    if (effectiveAutoStart && !isTeamMode && !repoId) return false;
+    // In team mode, we need a repo for the workers
+    if (isTeamMode && !repoId) return false;
     return true;
-  }, [validRows, effectiveAutoStart, isSwarmMode, executorProfileId, repoId]);
+  }, [validRows, effectiveAutoStart, isTeamMode, executorProfileId, repoId]);
 
   const handleRowChange = useCallback(
     (id: string, field: 'prompt' | 'branch', value: string) => {
@@ -632,44 +631,43 @@ export function QuickTaskInput({
         parent_workspace_id: null,
         image_ids: imageIds,
         metadata: null,
-        // Mark as epic task for swarm mode
-        is_epic: isSwarmMode ? true : null,
-        complexity: isSwarmMode ? ('epic' as const) : null,
+        // Mark as epic task for team mode
+        is_epic: isTeamMode ? true : null,
+        complexity: isTeamMode ? ('epic' as const) : null,
       };
 
       try {
-        if (isSwarmMode && repoId) {
-          // Swarm mode: create epic task and start swarm execution
+        if (isTeamMode && repoId) {
+          // Team mode: create epic task and start team execution
           const createdTask = await createTask.mutateAsync(task);
           if (createdTask) {
             try {
-              // Create swarm execution
-              const response = await fetch('/api/swarms', {
+              // Create team execution
+              const response = await fetch('/api/teams', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 body: JSON.stringify({
                   epic_task_id: createdTask.id,
-                  reviewer_count: reviewerCount,
                   max_parallel_workers: maxParallelWorkers,
                 }),
               });
               if (!response.ok) {
                 const errorText = await response.text();
-                console.error('Failed to create swarm execution:', response.status, errorText);
-                alert(`Epic task created, but swarm execution failed: ${errorText}\n\nPlease configure a planner agent in Settings → Agents.`);
+                console.error('Failed to create team execution:', response.status, errorText);
+                alert(`Epic task created, but team execution failed: ${errorText}\n\nPlease configure a planner agent in Settings → Agents.`);
               } else {
-                const swarmExecution = await response.json();
+                const teamExecution = await response.json();
                 // Generate plan
-                const planResponse = await fetch(`/api/swarms/${swarmExecution.id}/plan`, {
+                const planResponse = await fetch(`/api/teams/${teamExecution.id}/plan`, {
                   method: 'POST',
                 });
                 if (!planResponse.ok) {
                   const planError = await planResponse.text();
                   console.error('Failed to generate plan:', planError);
-                  alert(`Swarm created, but plan generation failed: ${planError}`);
+                  alert(`Team created, but plan generation failed: ${planError}`);
                 } else {
                   // Execute plan
-                  const executeResponse = await fetch(`/api/swarms/${swarmExecution.id}/execute`, {
+                  const executeResponse = await fetch(`/api/teams/${teamExecution.id}/execute`, {
                     method: 'POST',
                   });
                   if (!executeResponse.ok) {
@@ -680,8 +678,8 @@ export function QuickTaskInput({
                 }
               }
             } catch (err) {
-              console.error('Failed to start swarm execution:', err);
-              alert(`Failed to start swarm execution: ${err}`);
+              console.error('Failed to start team execution:', err);
+              alert(`Failed to start team execution: ${err}`);
             }
           }
           results.push({ success: true, row });
@@ -727,9 +725,8 @@ export function QuickTaskInput({
     createAndStart,
     createTask,
     defaultBranch,
-    isSwarmMode,
+    isTeamMode,
     maxParallelWorkers,
-    reviewerCount,
   ]);
 
   const handleKeyDown = useCallback(
@@ -835,18 +832,18 @@ export function QuickTaskInput({
               id="quick-autostart"
               checked={effectiveAutoStart}
               onCheckedChange={handleAutoStartChange}
-              disabled={isSubmitting || loading || isSwarmMode}
+              disabled={isSubmitting || loading || isTeamMode}
               className="data-[state=checked]:bg-gray-900 dark:data-[state=checked]:bg-gray-100"
             />
             <Label
               htmlFor="quick-autostart"
               className={cn(
                 'text-sm cursor-pointer text-muted-foreground',
-                isSwarmMode && 'opacity-70'
+                isTeamMode && 'opacity-70'
               )}
             >
               {t('taskFormDialog.startLabel')}
-              {isSwarmMode && (
+              {isTeamMode && (
                 <span className="ml-1 text-xs text-purple-600 dark:text-purple-400">
                   (required)
                 </span>
@@ -866,24 +863,24 @@ export function QuickTaskInput({
               size="sm"
               className={cn(
                 'gap-2',
-                isSwarmMode && 'bg-purple-600 hover:bg-purple-700'
+                isTeamMode && 'bg-purple-600 hover:bg-purple-700'
               )}
             >
               {isSubmitting ? (
                 <>
                   <Loader2 className="h-4 w-4 animate-spin" />
-                  {isSwarmMode
+                  {isTeamMode
                     ? t('quickInput.launchingSwarm', { count: submittingCount })
                     : t('quickInput.creating', { count: submittingCount })}
                 </>
               ) : (
                 <>
-                  {isSwarmMode ? (
+                  {isTeamMode ? (
                     <Users className="h-4 w-4" />
                   ) : (
                     <Send className="h-4 w-4" />
                   )}
-                  {isSwarmMode
+                  {isTeamMode
                     ? t('quickInput.launchSwarm')
                     : autoStart
                       ? t('quickInput.start')
@@ -913,7 +910,7 @@ export function QuickTaskInput({
                   {t('quickInput.singleAgent')}
                 </TabsTrigger>
                 <TabsTrigger
-                  value="swarm"
+                  value="team"
                   className="flex items-center gap-1.5 text-xs"
                   disabled={isSubmitting}
                 >
@@ -926,8 +923,8 @@ export function QuickTaskInput({
               </TabsList>
             </Tabs>
 
-            {/* Swarm description */}
-            {isSwarmMode && (
+            {/* Team description */}
+            {isTeamMode && (
               <div className="p-2.5 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
                 <div className="flex items-start gap-2">
                   <Crown className="h-4 w-4 text-purple-600 mt-0.5 flex-shrink-0" />
@@ -943,8 +940,8 @@ export function QuickTaskInput({
               </div>
             )}
 
-            {/* Swarm Configuration */}
-            {isSwarmMode && (
+            {/* Team Configuration */}
+            {isTeamMode && (
               <div className="space-y-3 p-3 border rounded-lg bg-background">
                 <div className="flex items-center gap-2">
                   <Zap className="h-3.5 w-3.5 text-yellow-600" />
@@ -973,35 +970,13 @@ export function QuickTaskInput({
                   </p>
                 </div>
 
-                {/* Reviewer Count */}
-                <div className="space-y-1.5">
-                  <div className="flex items-center justify-between">
-                    <Label className="text-xs">{t('quickInput.reviewers')}</Label>
-                    <span className="text-xs font-medium">{reviewerCount}</span>
-                  </div>
-                  <Slider
-                    value={[reviewerCount]}
-                    onValueChange={([v]) => setReviewerCount(v)}
-                    min={1}
-                    max={7}
-                    step={1}
-                    disabled={isSubmitting}
-                    className="w-full"
-                  />
-                  <p className="text-[10px] text-muted-foreground">
-                    {t('quickInput.reviewersHint', {
-                      approvals: Math.floor((reviewerCount * 2) / 3) + 1,
-                      faulty: Math.floor((reviewerCount - 1) / 3),
-                    })}
-                  </p>
-                </div>
               </div>
             )}
           </div>
         )}
 
-        {/* Executor selector - shown when autoStart is enabled and NOT in swarm mode */}
-        {autoStart && !isSwarmMode && !loading && profiles && (
+        {/* Executor selector - shown when autoStart is enabled and NOT in team mode */}
+        {autoStart && !isTeamMode && !loading && profiles && (
           <div className="mt-3 pt-3 border-t">
             <ExecutorProfileSelector
               profiles={profiles}
@@ -1018,7 +993,7 @@ export function QuickTaskInput({
 
       {/* Hint text */}
       <p className="text-center text-xs text-muted-foreground mt-3">
-        {isSwarmMode ? t('quickInput.hintSwarm') : t('quickInput.hintMulti')}
+        {isTeamMode ? t('quickInput.hintSwarm') : t('quickInput.hintMulti')}
       </p>
     </div>
   );

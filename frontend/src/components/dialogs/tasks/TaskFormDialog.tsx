@@ -56,7 +56,7 @@ import type {
 } from 'shared/types';
 
 // Execution mode type
-type ExecutionMode = 'single' | 'swarm';
+type ExecutionMode = 'single' | 'team';
 
 interface Task {
   id: string;
@@ -88,10 +88,9 @@ type TaskFormValues = {
   executorProfileId: ExecutorProfileId | null;
   repoBranches: RepoBranch[];
   autoStart: boolean;
-  // Swarm-specific options
+  // Team-specific options
   executionMode: ExecutionMode;
   maxParallelWorkers: number;
-  reviewerCount: number;
 };
 
 const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
@@ -149,7 +148,6 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
           autoStart: false,
           executionMode: 'single',
           maxParallelWorkers: 3,
-          reviewerCount: 3,
         };
 
       case 'duplicate':
@@ -162,7 +160,6 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
           autoStart: true,
           executionMode: 'single',
           maxParallelWorkers: 3,
-          reviewerCount: 3,
         };
 
       case 'subtask':
@@ -177,7 +174,6 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
           autoStart: true,
           executionMode: 'single',
           maxParallelWorkers: 3,
-          reviewerCount: 3,
         };
     }
   }, [mode, props, system.config?.executor_profile, defaultRepoBranches]);
@@ -204,7 +200,7 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
     } else {
       const imageIds =
         newlyUploadedImageIds.length > 0 ? newlyUploadedImageIds : null;
-      const isSwarmMode = value.executionMode === 'swarm';
+      const isTeamMode = value.executionMode === 'team';
       const task = {
         project_id: projectId,
         title: value.title,
@@ -214,45 +210,44 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
           mode === 'subtask' ? props.parentTaskAttemptId : null,
         image_ids: imageIds,
         metadata: null,
-        // Mark as epic task for swarm mode
-        is_epic: isSwarmMode ? true : null,
-        complexity: isSwarmMode ? ('epic' as TaskComplexity) : null,
+        // Mark as epic task for team mode
+        is_epic: isTeamMode ? true : null,
+        complexity: isTeamMode ? ('epic' as TaskComplexity) : null,
       };
       const shouldAutoStart = value.autoStart && !forceCreateOnlyRef.current;
       
-      if (isSwarmMode) {
-        // Create epic task and start swarm execution
+      if (isTeamMode) {
+        // Create epic task and start team execution
         const createdTask = await createTask.mutateAsync(task);
         if (shouldAutoStart && createdTask) {
           try {
-            // Create swarm execution
-            const response = await fetch('/api/swarms', {
+            // Create team execution
+            const response = await fetch('/api/teams', {
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
                 epic_task_id: createdTask.id,
-                reviewer_count: value.reviewerCount,
                 max_parallel_workers: value.maxParallelWorkers,
               }),
             });
             if (!response.ok) {
               const errorText = await response.text();
-              console.error('Failed to create swarm execution:', response.status, errorText);
-              // Show error to user - swarm creation failed but task was created
-              alert(`Epic task created, but swarm execution failed to start: ${errorText}\n\nPlease configure a planner agent in Settings → Agents.`);
+              console.error('Failed to create team execution:', response.status, errorText);
+              // Show error to user - team creation failed but task was created
+              alert(`Epic task created, but team execution failed to start: ${errorText}\n\nPlease configure a planner agent in Settings → Agents.`);
             } else {
-              const swarmExecution = await response.json();
+              const teamExecution = await response.json();
               // Generate plan
-              const planResponse = await fetch(`/api/swarms/${swarmExecution.id}/plan`, {
+              const planResponse = await fetch(`/api/teams/${teamExecution.id}/plan`, {
                 method: 'POST',
               });
               if (!planResponse.ok) {
                 const planError = await planResponse.text();
                 console.error('Failed to generate plan:', planError);
-                alert(`Swarm execution created, but plan generation failed: ${planError}`);
+                alert(`Team execution created, but plan generation failed: ${planError}`);
               } else {
                 // Execute plan
-                const executeResponse = await fetch(`/api/swarms/${swarmExecution.id}/execute`, {
+                const executeResponse = await fetch(`/api/teams/${teamExecution.id}/execute`, {
                   method: 'POST',
                 });
                 if (!executeResponse.ok) {
@@ -263,8 +258,8 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
               }
             }
           } catch (err) {
-            console.error('Failed to start swarm execution:', err);
-            alert(`Failed to start swarm execution: ${err}`);
+            console.error('Failed to start team execution:', err);
+            alert(`Failed to start team execution: ${err}`);
           }
         }
         modal.remove();
@@ -290,9 +285,9 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
   const validator = (value: TaskFormValues): string | undefined => {
     if (!value.title.trim().length) return 'need title';
     if (value.autoStart && !forceCreateOnlyRef.current) {
-      // In swarm mode, we don't need an executor profile - the swarm manages execution
-      const isSwarmMode = value.executionMode === 'swarm';
-      if (!isSwarmMode && !value.executorProfileId) return 'need executor profile';
+      // In team mode, we don't need an executor profile - the team manages execution
+      const isTeamMode = value.executionMode === 'team';
+      if (!isTeamMode && !value.executorProfileId) return 'need executor profile';
       if (
         value.repoBranches.length === 0 ||
         value.repoBranches.some((rb) => !rb.branch)
@@ -596,12 +591,12 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
                         Single Agent
                       </TabsTrigger>
                       <TabsTrigger
-                        value="swarm"
+                        value="team"
                         className="flex items-center gap-2"
                         disabled={isSubmitting}
                       >
                         <Users className="h-4 w-4" />
-                        Agent Swarm
+                        Agent Team
                         <Badge variant="secondary" className="ml-1 text-xs">
                           Beta
                         </Badge>
@@ -609,19 +604,18 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
                     </TabsList>
                   </Tabs>
 
-                  {/* Swarm description */}
-                  {modeField.state.value === 'swarm' && (
+                  {/* Team description */}
+                  {modeField.state.value === 'team' && (
                     <div className="p-3 bg-purple-50 dark:bg-purple-900/20 rounded-lg border border-purple-200 dark:border-purple-800">
                       <div className="flex items-start gap-2">
                         <Crown className="h-4 w-4 text-purple-600 mt-0.5" />
                         <div className="text-sm">
                           <p className="font-medium text-purple-900 dark:text-purple-100">
-                            Epic Task with Agent Swarm
+                            Epic Task with Agent Team
                           </p>
                           <p className="text-purple-700 dark:text-purple-300 mt-1">
-                            Your task will be analyzed by a Planner Agent and broken into subtasks. 
-                            Multiple worker agents will execute subtasks in parallel, followed by 
-                            consensus review (pBFT) before merging.
+                            Your task will be analyzed by a Team Manager agent and broken into subtasks. 
+                            Multiple worker agents will execute subtasks in parallel.
                           </p>
                         </div>
                       </div>
@@ -632,15 +626,15 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
             </form.Field>
           )}
 
-          {/* Swarm Configuration (only in swarm mode) */}
+          {/* Team Configuration (only in team mode) */}
           {!editMode && (
             <form.Subscribe selector={(state) => state.values.executionMode}>
               {(executionMode) =>
-                executionMode === 'swarm' && (
+                executionMode === 'team' && (
                   <div className="space-y-4 p-4 border rounded-lg bg-muted/30">
                     <div className="flex items-center gap-2">
                       <Zap className="h-4 w-4 text-yellow-600" />
-                      <Label className="text-sm font-medium">Swarm Configuration</Label>
+                      <Label className="text-sm font-medium">Team Configuration</Label>
                     </div>
 
                     {/* Max Parallel Workers */}
@@ -662,31 +656,6 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
                           />
                           <p className="text-xs text-muted-foreground">
                             Maximum agents working simultaneously
-                          </p>
-                        </div>
-                      )}
-                    </form.Field>
-
-                    {/* Reviewer Count */}
-                    <form.Field name="reviewerCount">
-                      {(field) => (
-                        <div className="space-y-2">
-                          <div className="flex items-center justify-between">
-                            <Label className="text-sm">Reviewers (pBFT)</Label>
-                            <span className="text-sm font-medium">{field.state.value}</span>
-                          </div>
-                          <Slider
-                            value={[field.state.value]}
-                            onValueChange={([v]) => field.handleChange(v)}
-                            min={1}
-                            max={7}
-                            step={1}
-                            disabled={isSubmitting}
-                            className="w-full"
-                          />
-                          <p className="text-xs text-muted-foreground">
-                            Needs {Math.floor((field.state.value * 2) / 3) + 1} approvals 
-                            (tolerates {Math.floor((field.state.value - 1) / 3)} faulty)
                           </p>
                         </div>
                       )}
@@ -857,18 +826,18 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
                 })}
               >
                 {({ canSubmit, isSubmitting, values }) => {
-                  const isSwarmMode = values.executionMode === 'swarm';
+                  const isTeamMode = values.executionMode === 'team';
                   let buttonText: string;
                   
                   if (editMode) {
                     buttonText = isSubmitting
                       ? t('taskFormDialog.updating')
                       : t('taskFormDialog.updateTask');
-                  } else if (isSwarmMode) {
+                  } else if (isTeamMode) {
                     buttonText = isSubmitting
-                      ? 'Launching Swarm...'
+                      ? 'Launching Team...'
                       : values.autoStart
-                        ? 'Launch Agent Swarm'
+                        ? 'Launch Agent Team'
                         : 'Create Epic Task';
                   } else {
                     buttonText = isSubmitting
@@ -882,9 +851,9 @@ const TaskFormDialogImpl = NiceModal.create<TaskFormDialogProps>((props) => {
                     <Button 
                       onClick={form.handleSubmit} 
                       disabled={!canSubmit}
-                      className={isSwarmMode ? 'bg-purple-600 hover:bg-purple-700' : ''}
+                      className={isTeamMode ? 'bg-purple-600 hover:bg-purple-700' : ''}
                     >
-                      {isSwarmMode && <Users className="h-4 w-4 mr-2" />}
+                      {isTeamMode && <Users className="h-4 w-4 mr-2" />}
                       {buttonText}
                     </Button>
                   );

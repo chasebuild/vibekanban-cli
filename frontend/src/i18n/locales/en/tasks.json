@@ -36,17 +36,17 @@
     "hintMulti": "⌘↵ to start • Drag & drop or paste images • Add multiple tasks",
     "collapse": "Collapse",
     "singleAgent": "Single Agent",
-    "agentSwarm": "Agent Swarm",
-    "launchSwarm": "Launch Swarm",
+    "agentSwarm": "Agent Team",
+    "launchSwarm": "Launch Team",
     "launchingSwarm": "Launching {{count}}...",
-    "swarmTitle": "Epic Tasks with Agent Swarm",
-    "swarmDescription": "Tasks will be analyzed by a Planner Agent and broken into subtasks. Multiple worker agents execute in parallel, followed by consensus review (pBFT).",
-    "swarmConfig": "Swarm Configuration",
+    "swarmTitle": "Epic Tasks with Agent Teams",
+    "swarmDescription": "Tasks will be analyzed by a Team Manager agent and broken into subtasks. Multiple worker agents execute in parallel.",
+    "swarmConfig": "Team Configuration",
     "parallelWorkers": "Parallel Workers",
     "parallelWorkersHint": "Maximum agents working simultaneously",
     "reviewers": "Reviewers (pBFT)",
     "reviewersHint": "Needs {{approvals}} approvals (tolerates {{faulty}} faulty)",
-    "hintSwarm": "⌘↵ to launch swarm • Add multiple epic tasks • Parallel execution with pBFT consensus"
+    "hintSwarm": "⌘↵ to launch team • Add multiple epic tasks • Parallel execution"
   },
   "actions": {
     "addTask": "Add task"

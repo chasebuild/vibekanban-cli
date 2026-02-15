@@ -1,8 +1,8 @@
 import { useMemo } from 'react';
 import {
-  SwarmExecution,
-  SwarmProgress,
-  SwarmExecutionStatus,
+  TeamExecution,
+  TeamProgress,
+  TeamExecutionStatus,
 } from '../../../shared/types';
 import { Progress } from '../ui/progress';
 import { Badge } from '../ui/badge';
@@ -17,52 +17,47 @@ import {
   GitBranch,
 } from 'lucide-react';
 
-interface SwarmExecutionCardProps {
-  execution: SwarmExecution;
-  progress: SwarmProgress;
+interface TeamExecutionCardProps {
+  execution: TeamExecution;
+  progress: TeamProgress;
   onPause?: () => void;
   onResume?: () => void;
   onCancel?: () => void;
   onViewDetails?: () => void;
 }
 
-const statusColors: Record<SwarmExecutionStatus, string> = {
+const statusColors: Record<TeamExecutionStatus, string> = {
   planning: 'bg-yellow-500',
   planned: 'bg-blue-500',
   executing: 'bg-green-500',
-  reviewing: 'bg-purple-500',
-  merging: 'bg-indigo-500',
   completed: 'bg-emerald-500',
   failed: 'bg-red-500',
   cancelled: 'bg-gray-500',
 };
 
-const statusLabels: Record<SwarmExecutionStatus, string> = {
+const statusLabels: Record<TeamExecutionStatus, string> = {
   planning: 'Planning',
   planned: 'Ready',
   executing: 'Executing',
-  reviewing: 'In Review',
-  merging: 'Merging',
   completed: 'Completed',
   failed: 'Failed',
   cancelled: 'Cancelled',
 };
 
-export function SwarmExecutionCard({
+export function TeamExecutionCard({
   execution,
   progress,
   onPause,
   onResume,
   onCancel,
   onViewDetails,
-}: SwarmExecutionCardProps) {
+}: TeamExecutionCardProps) {
   const progressPercentage = useMemo(() => {
     if (progress.total === 0) return 0;
     return Math.round((progress.completed / progress.total) * 100);
   }, [progress]);
 
-  const isActive =
-    execution.status === 'executing' || execution.status === 'reviewing';
+  const isActive = execution.status === 'executing';
   const isPaused = execution.status === 'planned';
   const canControl =
     execution.status !== 'completed' &&
@@ -149,10 +144,7 @@ export function SwarmExecutionCard({
           </div>
           <div className="flex items-center gap-1">
             <GitBranch className="h-4 w-4" />
-            <span>
-              {execution.consensus_approvals}/{execution.consensus_threshold}{' '}
-              approvals
-            </span>
+            <span>Team branches</span>
           </div>
         </div>
         {onViewDetails && (

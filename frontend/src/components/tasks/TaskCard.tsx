@@ -11,7 +11,7 @@ import { attemptsApi } from '@/lib/api';
 import { TaskCardHeader } from './TaskCardHeader';
 import { useTranslation } from 'react-i18next';
 import NiceModal from '@ebay/nice-modal-react';
-import { SwarmExecutionDialog } from '@/components/dialogs';
+import { TeamExecutionDialog } from '@/components/dialogs';
 
 type Task = TaskWithAttemptStatus;
 
@@ -63,10 +63,10 @@ export function TaskCard({
     [task.parent_workspace_id, projectId, navigate, isNavigatingToParent]
   );
 
-  const handleSwarmClick = useCallback(
+  const handleTeamClick = useCallback(
     (e: React.MouseEvent) => {
       e.stopPropagation();
-      NiceModal.show(SwarmExecutionDialog, {
+      NiceModal.show(TeamExecutionDialog, {
         taskId: task.id,
         taskTitle: task.title,
       });
@@ -110,14 +110,14 @@ export function TaskCard({
               {task.last_attempt_failed && (
                 <XCircle className="h-4 w-4 text-destructive" />
               )}
-              {/* Epic task indicator and swarm button */}
+              {/* Epic task indicator and team button */}
               {task.is_epic && (
                 <Button
                   variant="icon"
-                  onClick={handleSwarmClick}
+                  onClick={handleTeamClick}
                   onPointerDown={(e) => e.stopPropagation()}
                   onMouseDown={(e) => e.stopPropagation()}
-                  title="Manage Agent Swarm"
+                  title="Manage Agent Team"
                   className="text-purple-600 hover:text-purple-700"
                 >
                   <Users className="h-4 w-4" />

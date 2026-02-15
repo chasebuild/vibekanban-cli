@@ -1,13 +1,13 @@
-//! Planner Agent Service
+//! Team Planner Service
 //!
 //! Responsible for analyzing epic tasks and decomposing them into atomic subtasks.
 //! The planner evaluates task complexity and determines whether to use single-agent
-//! execution or swarm-based parallel execution.
+//! execution or team-based parallel execution.
 
 use db::models::{
     agent_profile::AgentProfile,
-    swarm_execution::{CreateSwarmExecution, PlannedSubtask, SwarmExecution, SwarmExecutionStatus, SwarmPlanOutput},
-    swarm_task::{CreateSwarmTask, SwarmTask},
+    team_execution::{CreateTeamExecution, PlannedSubtask, TeamExecution, TeamExecutionStatus, TeamPlanOutput},
+    team_task::{CreateTeamTask, TeamTask},
     task::{CreateTask, Task, TaskComplexity, TaskStatus},
 };
 use serde::{Deserialize, Serialize};
@@ -23,7 +23,7 @@ pub enum PlannerError {
     TaskNotFound(Uuid),
     #[error("Task is not an epic task")]
     NotEpicTask,
-    #[error("No planner agent available")]
+    #[error("No team manager agent available")]
     NoPlannerAgent,
     #[error("Planning failed: {0}")]
     PlanningFailed(String),
@@ -36,12 +36,10 @@ pub enum PlannerError {
 /// Configuration for the planner service
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct PlannerConfig {
-    /// Minimum subtasks to trigger swarm execution
-    pub swarm_threshold: i32,
+    /// Minimum subtasks to trigger team execution
+    pub team_threshold: i32,
     /// Maximum subtasks per epic
     pub max_subtasks: i32,
-    /// Default reviewer count
-    pub default_reviewer_count: i32,
     /// Maximum parallel workers
     pub max_parallel_workers: i32,
 }
@@ -49,9 +47,8 @@ pub struct PlannerConfig {
 impl Default for PlannerConfig {
     fn default() -> Self {
         Self {
-            swarm_threshold: 2,
+            team_threshold: 2,
             max_subtasks: 10,
-            default_reviewer_count: 3,
             max_parallel_workers: 5,
         }
     }
@@ -79,9 +76,9 @@ impl PlannerService {
     pub async fn analyze_complexity(&self, task: &Task) -> TaskComplexity {
         let description_len = task.description.as_ref().map(|d| d.len()).unwrap_or(0);
         let title_complexity = self.estimate_title_complexity(&task.title);
-        
+
         // Simple heuristics for complexity estimation
-        // In production, this would use the planner agent
+        // In production, this would use the team manager agent
         match (description_len, title_complexity) {
             (0..=50, 1) => TaskComplexity::Trivial,
             (0..=200, 1..=2) => TaskComplexity::Simple,
@@ -96,7 +93,7 @@ impl PlannerService {
             "refactor", "implement", "build", "create", "design",
             "integrate", "migrate", "optimize", "architecture",
         ];
-        
+
         let complexity_keywords = [
             "system", "framework", "platform", "engine", "complete",
             "full", "entire", "comprehensive", "end-to-end",
@@ -104,13 +101,13 @@ impl PlannerService {
 
         let mut score = 1;
         let lower_title = title.to_lowercase();
-        
+
         for kw in &keywords {
             if lower_title.contains(kw) {
                 score += 1;
             }
         }
-        
+
         for kw in &complexity_keywords {
             if lower_title.contains(kw) {
                 score += 2;
@@ -120,12 +117,13 @@ impl PlannerService {
         score.min(5)
     }
 
-    /// Create a swarm execution for an epic task
-    pub async fn create_swarm_execution(
+    /// Create a team execution for an epic task
+    pub async fn create_team_execution(
         &self,
         epic_task_id: Uuid,
         workspace_id: Option<Uuid>,
-    ) -> Result<SwarmExecution, PlannerError> {
+        max_parallel_workers: Option<i32>,
+    ) -> Result<TeamExecution, PlannerError> {
         // Verify task exists and is epic
         let task = Task::find_by_id(&self.pool, epic_task_id)
             .await?
@@ -139,15 +137,16 @@ impl PlannerService {
         let planners = AgentProfile::find_planners(&self.pool).await?;
         let planner = planners.first().ok_or(PlannerError::NoPlannerAgent)?;
 
-        // Create swarm execution
-        let execution = SwarmExecution::create(
+        let max_parallel = max_parallel_workers.unwrap_or(self.config.max_parallel_workers);
+
+        // Create team execution
+        let execution = TeamExecution::create(
             &self.pool,
-            &CreateSwarmExecution {
+            &CreateTeamExecution {
                 epic_task_id,
                 epic_workspace_id: workspace_id,
                 planner_profile_id: Some(planner.id),
-                reviewer_count: Some(self.config.default_reviewer_count),
-                max_parallel_workers: Some(self.config.max_parallel_workers),
+                max_parallel_workers: Some(max_parallel),
             },
         )
         .await?;
@@ -156,12 +155,12 @@ impl PlannerService {
     }
 
     /// Generate a decomposition plan for an epic task
-    /// In production, this would invoke the planner agent
+    /// In production, this would invoke the team manager agent
     pub async fn generate_plan(
         &self,
-        swarm_execution_id: Uuid,
-    ) -> Result<SwarmPlanOutput, PlannerError> {
-        let execution = SwarmExecution::find_by_id(&self.pool, swarm_execution_id)
+        team_execution_id: Uuid,
+    ) -> Result<TeamPlanOutput, PlannerError> {
+        let execution = TeamExecution::find_by_id(&self.pool, team_execution_id)
             .await?
             .ok_or(PlannerError::PlanningFailed("Execution not found".into()))?;
 
@@ -170,30 +169,30 @@ impl PlannerService {
             .ok_or(PlannerError::TaskNotFound(execution.epic_task_id))?;
 
         // Generate plan based on task analysis
-        // This is a simplified version - in production, invoke the planner agent
+        // This is a simplified version - in production, invoke the team manager agent
         let plan = self.decompose_task(&task).await?;
 
         // Save plan output
         let plan_json = serde_json::to_string(&plan)?;
-        SwarmExecution::set_planner_output(&self.pool, swarm_execution_id, &plan_json).await?;
-        SwarmExecution::update_status(&self.pool, swarm_execution_id, SwarmExecutionStatus::Planned).await?;
+        TeamExecution::set_planner_output(&self.pool, team_execution_id, &plan_json).await?;
+        TeamExecution::update_status(&self.pool, team_execution_id, TeamExecutionStatus::Planned).await?;
 
         Ok(plan)
     }
 
     /// Decompose a task into subtasks
-    async fn decompose_task(&self, task: &Task) -> Result<SwarmPlanOutput, PlannerError> {
+    async fn decompose_task(&self, task: &Task) -> Result<TeamPlanOutput, PlannerError> {
         let complexity = self.analyze_complexity(task).await;
-        
+
         // Simple rule-based decomposition for demonstration
-        // In production, this would be done by the planner agent
+        // In production, this would be done by the team manager agent
         let subtasks = self.generate_subtasks(task, &complexity);
         let subtasks_count = subtasks.len();
-        let requires_swarm = subtasks_count >= self.config.swarm_threshold as usize;
+        let requires_team = subtasks_count >= self.config.team_threshold as usize;
 
-        Ok(SwarmPlanOutput {
+        Ok(TeamPlanOutput {
             complexity: format!("{:?}", complexity),
-            requires_swarm,
+            requires_team,
             subtasks,
             estimated_total_duration: None,
             reasoning: format!(
@@ -207,8 +206,8 @@ impl PlannerService {
 
     fn generate_subtasks(&self, task: &Task, complexity: &TaskComplexity) -> Vec<PlannedSubtask> {
         // This is a simplified implementation
-        // In production, the planner agent would analyze the task and generate proper subtasks
-        
+        // In production, the team manager agent would analyze the task and generate proper subtasks
+
         let base_subtasks = match complexity {
             TaskComplexity::Trivial | TaskComplexity::Simple => {
                 vec![PlannedSubtask {
@@ -305,13 +304,13 @@ impl PlannerService {
         base_subtasks
     }
 
-    /// Create actual tasks and swarm tasks from a plan
+    /// Create actual tasks and team tasks from a plan
     pub async fn execute_plan(
         &self,
-        swarm_execution_id: Uuid,
-        plan: &SwarmPlanOutput,
-    ) -> Result<Vec<SwarmTask>, PlannerError> {
-        let execution = SwarmExecution::find_by_id(&self.pool, swarm_execution_id)
+        team_execution_id: Uuid,
+        plan: &TeamPlanOutput,
+    ) -> Result<Vec<TeamTask>, PlannerError> {
+        let execution = TeamExecution::find_by_id(&self.pool, team_execution_id)
             .await?
             .ok_or(PlannerError::PlanningFailed("Execution not found".into()))?;
 
@@ -319,7 +318,7 @@ impl PlannerService {
             .await?
             .ok_or(PlannerError::TaskNotFound(execution.epic_task_id))?;
 
-        let mut swarm_tasks = Vec::new();
+        let mut team_tasks = Vec::new();
         let mut task_id_map: std::collections::HashMap<usize, Uuid> = std::collections::HashMap::new();
 
         for (idx, planned) in plan.subtasks.iter().enumerate() {
@@ -356,11 +355,11 @@ impl PlannerService {
                 .filter_map(|&dep_idx| task_id_map.get(&(dep_idx as usize)).copied())
                 .collect();
 
-            // Create the swarm task
-            let swarm_task = SwarmTask::create(
+            // Create the team task
+            let team_task = TeamTask::create(
                 &self.pool,
-                &CreateSwarmTask {
-                    swarm_execution_id,
+                &CreateTeamTask {
+                    team_execution_id,
                     task_id: task.id,
                     sequence_order: idx as i32,
                     depends_on: if depends_on.is_empty() {
@@ -375,14 +374,14 @@ impl PlannerService {
             )
             .await?;
 
-            swarm_tasks.push(swarm_task);
+            team_tasks.push(team_task);
         }
 
         // Update execution status
-        SwarmExecution::update_status(&self.pool, swarm_execution_id, SwarmExecutionStatus::Executing)
+        TeamExecution::update_status(&self.pool, team_execution_id, TeamExecutionStatus::Executing)
             .await?;
 
-        Ok(swarm_tasks)
+        Ok(team_tasks)
     }
 }
 

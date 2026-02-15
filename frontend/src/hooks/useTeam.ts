@@ -1,57 +1,48 @@
 import { useState, useCallback } from 'react';
 import { api } from '../lib/api';
 import {
-  SwarmExecution,
-  SwarmTask,
-  SwarmProgress,
-  SwarmPlanOutput,
-  ConsensusReview,
-  ConsensusSummary,
+  TeamExecution,
+  TeamTask,
+  TeamProgress,
+  TeamPlanOutput,
   AgentSkill,
   AgentProfile,
   Task,
 } from 'shared/types';
 
-interface SwarmExecutionResponse {
-  execution: SwarmExecution;
-  tasks: SwarmTask[];
-  progress: SwarmProgress;
+interface TeamExecutionResponse {
+  execution: TeamExecution;
+  tasks: TeamTask[];
+  progress: TeamProgress;
 }
 
-interface SwarmPlanResponse {
-  execution: SwarmExecution;
-  plan: SwarmPlanOutput;
+interface TeamPlanResponse {
+  execution: TeamExecution;
+  plan: TeamPlanOutput;
 }
 
-interface ConsensusStatusResponse {
-  execution: SwarmExecution;
-  reviews: ConsensusReview[];
-  summary: ConsensusSummary;
-}
-
-export function useSwarm() {
+export function useTeam() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // Swarm Execution operations
-  const createSwarmExecution = useCallback(
+  // Team Execution operations
+  const createTeamExecution = useCallback(
     async (
       epicTaskId: string,
       workspaceId?: string,
-      options?: { reviewerCount?: number; maxParallelWorkers?: number }
-    ): Promise<SwarmExecution | null> => {
+      options?: { maxParallelWorkers?: number }
+    ): Promise<TeamExecution | null> => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.post<SwarmExecution>('/swarms', {
+        const response = await api.post<TeamExecution>('/teams', {
           epic_task_id: epicTaskId,
           workspace_id: workspaceId,
-          reviewer_count: options?.reviewerCount,
           max_parallel_workers: options?.maxParallelWorkers,
         });
         return response.data;
       } catch (err: any) {
-        setError(err.message || 'Failed to create swarm execution');
+        setError(err.message || 'Failed to create team execution');
         return null;
       } finally {
         setLoading(false);
@@ -60,15 +51,15 @@ export function useSwarm() {
     []
   );
 
-  const getSwarmExecution = useCallback(
-    async (id: string): Promise<SwarmExecutionResponse | null> => {
+  const getTeamExecution = useCallback(
+    async (id: string): Promise<TeamExecutionResponse | null> => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.get<SwarmExecutionResponse>(`/swarms/${id}`);
+        const response = await api.get<TeamExecutionResponse>(`/teams/${id}`);
         return response.data;
       } catch (err: any) {
-        setError(err.message || 'Failed to get swarm execution');
+        setError(err.message || 'Failed to get team execution');
         return null;
       } finally {
         setLoading(false);
@@ -78,11 +69,11 @@ export function useSwarm() {
   );
 
   const generatePlan = useCallback(
-    async (id: string): Promise<SwarmPlanResponse | null> => {
+    async (id: string): Promise<TeamPlanResponse | null> => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.post<SwarmPlanResponse>(`/swarms/${id}/plan`);
+        const response = await api.post<TeamPlanResponse>(`/teams/${id}/plan`);
         return response.data;
       } catch (err: any) {
         setError(err.message || 'Failed to generate plan');
@@ -95,11 +86,11 @@ export function useSwarm() {
   );
 
   const executePlan = useCallback(
-    async (id: string): Promise<SwarmTask[] | null> => {
+    async (id: string): Promise<TeamTask[] | null> => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.post<SwarmTask[]>(`/swarms/${id}/execute`);
+        const response = await api.post<TeamTask[]>(`/teams/${id}/execute`);
         return response.data;
       } catch (err: any) {
         setError(err.message || 'Failed to execute plan');
@@ -112,9 +103,9 @@ export function useSwarm() {
   );
 
   const getProgress = useCallback(
-    async (id: string): Promise<SwarmProgress | null> => {
+    async (id: string): Promise<TeamProgress | null> => {
       try {
-        const response = await api.get<SwarmProgress>(`/swarms/${id}/progress`);
+        const response = await api.get<TeamProgress>(`/teams/${id}/progress`);
         return response.data;
       } catch (err: any) {
         return null;
@@ -124,11 +115,11 @@ export function useSwarm() {
   );
 
   const pauseExecution = useCallback(
-    async (id: string): Promise<SwarmExecution | null> => {
+    async (id: string): Promise<TeamExecution | null> => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.post<SwarmExecution>(`/swarms/${id}/pause`);
+        const response = await api.post<TeamExecution>(`/teams/${id}/pause`);
         return response.data;
       } catch (err: any) {
         setError(err.message || 'Failed to pause execution');
@@ -141,11 +132,11 @@ export function useSwarm() {
   );
 
   const resumeExecution = useCallback(
-    async (id: string): Promise<SwarmExecution | null> => {
+    async (id: string): Promise<TeamExecution | null> => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.post<SwarmExecution>(`/swarms/${id}/resume`);
+        const response = await api.post<TeamExecution>(`/teams/${id}/resume`);
         return response.data;
       } catch (err: any) {
         setError(err.message || 'Failed to resume execution');
@@ -158,72 +149,14 @@ export function useSwarm() {
   );
 
   const cancelExecution = useCallback(
-    async (id: string): Promise<SwarmExecution | null> => {
+    async (id: string): Promise<TeamExecution | null> => {
       setLoading(true);
       setError(null);
       try {
-        const response = await api.post<SwarmExecution>(`/swarms/${id}/cancel`);
+        const response = await api.post<TeamExecution>(`/teams/${id}/cancel`);
         return response.data;
       } catch (err: any) {
         setError(err.message || 'Failed to cancel execution');
-        return null;
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
-
-  // Consensus operations
-  const getConsensusStatus = useCallback(
-    async (id: string): Promise<ConsensusStatusResponse | null> => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await api.get<ConsensusStatusResponse>(
-          `/swarms/${id}/consensus`
-        );
-        return response.data;
-      } catch (err: any) {
-        setError(err.message || 'Failed to get consensus status');
-        return null;
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
-
-  const startConsensus = useCallback(
-    async (id: string): Promise<ConsensusReview[] | null> => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await api.post<ConsensusReview[]>(
-          `/swarms/${id}/consensus/start`
-        );
-        return response.data;
-      } catch (err: any) {
-        setError(err.message || 'Failed to start consensus');
-        return null;
-      } finally {
-        setLoading(false);
-      }
-    },
-    []
-  );
-
-  const finalizeConsensus = useCallback(
-    async (id: string): Promise<SwarmExecution | null> => {
-      setLoading(true);
-      setError(null);
-      try {
-        const response = await api.post<SwarmExecution>(
-          `/swarms/${id}/consensus/finalize`
-        );
-        return response.data;
-      } catch (err: any) {
-        setError(err.message || 'Failed to finalize consensus');
         return null;
       } finally {
         setLoading(false);
@@ -337,19 +270,15 @@ export function useSwarm() {
   return {
     loading,
     error,
-    // Swarm operations
-    createSwarmExecution,
-    getSwarmExecution,
+    // Team operations
+    createTeamExecution,
+    getTeamExecution,
     generatePlan,
     executePlan,
     getProgress,
     pauseExecution,
     resumeExecution,
     cancelExecution,
-    // Consensus operations
-    getConsensusStatus,
-    startConsensus,
-    finalizeConsensus,
     // Skills operations
     listSkills,
     createSkill,

@@ -45,7 +45,7 @@ pub struct Task {
     pub description: Option<String>,
     pub status: TaskStatus,
     pub parent_workspace_id: Option<Uuid>, // Foreign key to parent Workspace
-    pub is_epic: bool,                     // Whether this is an epic task for swarm execution
+    pub is_epic: bool,                     // Whether this is an epic task for team execution
     pub complexity: Option<TaskComplexity>, // Estimated complexity
     pub metadata: Option<String>,          // JSON metadata for additional properties
     pub created_at: DateTime<Utc>,
