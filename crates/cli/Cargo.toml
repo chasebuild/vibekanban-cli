@@ -4,6 +4,10 @@ version = "0.1.0"
 edition = "2024"
 description = "Interactive CLI for Vibe Kanban"
 authors = ["Vibe Kanban Team"]
+license = "MIT"
+repository = "https://github.com/chasebuild/vibekanban-cli"
+homepage = "https://github.com/chasebuild/vibekanban-cli"
+readme = "README.md"
 
 [dependencies]
 # Async runtime
