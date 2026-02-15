@@ -5,7 +5,9 @@ use strum_macros::{Display, EnumString};
 use ts_rs::TS;
 use uuid::Uuid;
 
-#[derive(Debug, Clone, Type, Serialize, Deserialize, PartialEq, TS, EnumString, Display, Default)]
+#[derive(
+    Debug, Clone, Type, Serialize, Deserialize, PartialEq, TS, EnumString, Display, Default,
+)]
 #[sqlx(type_name = "TEXT", rename_all = "lowercase")]
 #[serde(rename_all = "lowercase")]
 #[strum(serialize_all = "lowercase")]
@@ -82,17 +84,17 @@ impl TeamTask {
                 team_execution_id AS "team_execution_id!: Uuid",
                 task_id AS "task_id!: Uuid",
                 workspace_id AS "workspace_id: Uuid",
-                sequence_order,
+                sequence_order AS "sequence_order!: i32",
                 depends_on,
                 required_skills,
                 assigned_agent_profile_id AS "assigned_agent_profile_id: Uuid",
                 status AS "status!: TeamTaskStatus",
                 branch_name,
-                complexity,
-                duration_seconds,
+                complexity AS "complexity!: i32",
+                duration_seconds AS "duration_seconds: i32",
                 error_message,
-                retry_count,
-                max_retries,
+                retry_count AS "retry_count!: i32",
+                max_retries AS "max_retries!: i32",
                 started_at AS "started_at: DateTime<Utc>",
                 completed_at AS "completed_at: DateTime<Utc>",
                 created_at AS "created_at!: DateTime<Utc>",
@@ -116,17 +118,17 @@ impl TeamTask {
                 team_execution_id AS "team_execution_id!: Uuid",
                 task_id AS "task_id!: Uuid",
                 workspace_id AS "workspace_id: Uuid",
-                sequence_order,
+                sequence_order AS "sequence_order!: i32",
                 depends_on,
                 required_skills,
                 assigned_agent_profile_id AS "assigned_agent_profile_id: Uuid",
                 status AS "status!: TeamTaskStatus",
                 branch_name,
-                complexity,
-                duration_seconds,
+                complexity AS "complexity!: i32",
+                duration_seconds AS "duration_seconds: i32",
                 error_message,
-                retry_count,
-                max_retries,
+                retry_count AS "retry_count!: i32",
+                max_retries AS "max_retries!: i32",
                 started_at AS "started_at: DateTime<Utc>",
                 completed_at AS "completed_at: DateTime<Utc>",
                 created_at AS "created_at!: DateTime<Utc>",
@@ -153,9 +155,9 @@ impl TeamTask {
                     tasks.title AS "task_title!: String",
                     tasks.description AS "task_description: String",
                     agent_profiles.name AS "agent_name: String"
-                FROM tasks
+                FROM team_tasks
+                JOIN tasks ON team_tasks.task_id = tasks.id
                 LEFT JOIN agent_profiles ON agent_profiles.id = team_tasks.assigned_agent_profile_id
-                LEFT JOIN team_tasks ON team_tasks.task_id = tasks.id
                 WHERE team_tasks.id = $1"#,
                 task.id
             )
@@ -163,7 +165,11 @@ impl TeamTask {
             .await?;
 
             let (task_title, task_description, agent_name) = match task_details {
-                Some(details) => (details.task_title, details.task_description, details.agent_name),
+                Some(details) => (
+                    details.task_title,
+                    details.task_description,
+                    Some(details.agent_name),
+                ),
                 None => (String::new(), None, None),
             };
 
@@ -189,17 +195,17 @@ impl TeamTask {
                 team_execution_id AS "team_execution_id!: Uuid",
                 task_id AS "task_id!: Uuid",
                 workspace_id AS "workspace_id: Uuid",
-                sequence_order,
+                sequence_order AS "sequence_order!: i32",
                 depends_on,
                 required_skills,
                 assigned_agent_profile_id AS "assigned_agent_profile_id: Uuid",
                 status AS "status!: TeamTaskStatus",
                 branch_name,
-                complexity,
-                duration_seconds,
+                complexity AS "complexity!: i32",
+                duration_seconds AS "duration_seconds: i32",
                 error_message,
-                retry_count,
-                max_retries,
+                retry_count AS "retry_count!: i32",
+                max_retries AS "max_retries!: i32",
                 started_at AS "started_at: DateTime<Utc>",
                 completed_at AS "completed_at: DateTime<Utc>",
                 created_at AS "created_at!: DateTime<Utc>",
@@ -224,17 +230,17 @@ impl TeamTask {
                 team_execution_id AS "team_execution_id!: Uuid",
                 task_id AS "task_id!: Uuid",
                 workspace_id AS "workspace_id: Uuid",
-                sequence_order,
+                sequence_order AS "sequence_order!: i32",
                 depends_on,
                 required_skills,
                 assigned_agent_profile_id AS "assigned_agent_profile_id: Uuid",
                 status AS "status!: TeamTaskStatus",
                 branch_name,
-                complexity,
-                duration_seconds,
+                complexity AS "complexity!: i32",
+                duration_seconds AS "duration_seconds: i32",
                 error_message,
-                retry_count,
-                max_retries,
+                retry_count AS "retry_count!: i32",
+                max_retries AS "max_retries!: i32",
                 started_at AS "started_at: DateTime<Utc>",
                 completed_at AS "completed_at: DateTime<Utc>",
                 created_at AS "created_at!: DateTime<Utc>",
@@ -250,8 +256,14 @@ impl TeamTask {
 
     pub async fn create(pool: &SqlitePool, data: &CreateTeamTask) -> Result<Self, sqlx::Error> {
         let id = Uuid::new_v4();
-        let depends_on = data.depends_on.as_ref().map(|d| serde_json::to_string(d).unwrap());
-        let required_skills = data.required_skills.as_ref().map(|d| serde_json::to_string(d).unwrap());
+        let depends_on = data
+            .depends_on
+            .as_ref()
+            .map(|d| serde_json::to_string(d).unwrap());
+        let required_skills = data
+            .required_skills
+            .as_ref()
+            .map(|d| serde_json::to_string(d).unwrap());
         let complexity = data.complexity.unwrap_or(1);
         let max_retries = data.max_retries.unwrap_or(2);
 
@@ -265,17 +277,17 @@ impl TeamTask {
                 team_execution_id AS "team_execution_id!: Uuid",
                 task_id AS "task_id!: Uuid",
                 workspace_id AS "workspace_id: Uuid",
-                sequence_order,
+                sequence_order AS "sequence_order!: i32",
                 depends_on,
                 required_skills,
                 assigned_agent_profile_id AS "assigned_agent_profile_id: Uuid",
                 status AS "status!: TeamTaskStatus",
                 branch_name,
-                complexity,
-                duration_seconds,
+                complexity AS "complexity!: i32",
+                duration_seconds AS "duration_seconds: i32",
                 error_message,
-                retry_count,
-                max_retries,
+                retry_count AS "retry_count!: i32",
+                max_retries AS "max_retries!: i32",
                 started_at AS "started_at: DateTime<Utc>",
                 completed_at AS "completed_at: DateTime<Utc>",
                 created_at AS "created_at!: DateTime<Utc>",

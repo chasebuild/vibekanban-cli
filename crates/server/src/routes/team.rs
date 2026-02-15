@@ -13,10 +13,11 @@ use axum::{
 use db::models::{
     agent_profile::{AgentProfile, CreateAgentProfile, UpdateAgentProfile},
     agent_skill::{AgentSkill, CreateAgentSkill, UpdateAgentSkill},
+    task::Task,
     team_execution::{TeamExecution, TeamPlanOutput},
     team_task::{TeamProgress, TeamTask},
-    task::Task,
 };
+use deployment::Deployment;
 use serde::{Deserialize, Serialize};
 use sqlx::Error as SqlxError;
 use ts_rs::TS;
@@ -48,7 +49,7 @@ pub struct TeamPlanResponse {
 
 // ============== Routes ==============
 
-pub fn router(deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
+pub fn router(_deployment: &DeploymentImpl) -> Router<DeploymentImpl> {
     Router::new()
         // Team Execution routes
         .route("/teams", post(create_team_execution))

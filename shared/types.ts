@@ -72,39 +72,27 @@ export type SkillAssignment = { skill_id: string, proficiency: number | null, };
 
 export type UpdateAgentProfile = { name: string | null, description: string | null, executor: string | null, variant: string | null, executor_config: string | null, is_planner: boolean | null, is_reviewer: boolean | null, is_worker: boolean | null, max_concurrent_tasks: number | null, priority: number | null, active: boolean | null, };
 
-export type SwarmExecutionStatus = "planning" | "planned" | "executing" | "reviewing" | "merging" | "completed" | "failed" | "cancelled";
+export type TeamExecutionStatus = "planning" | "planned" | "executing" | "completed" | "failed" | "cancelled";
 
-export type SwarmExecution = { id: string, epic_task_id: string, epic_workspace_id: string | null, status: SwarmExecutionStatus, planner_output: string | null, planner_profile_id: string | null, reviewer_count: number, consensus_threshold: number, consensus_approvals: number, consensus_rejections: number, max_parallel_workers: number, error_message: string | null, planned_at: string | null, execution_started_at: string | null, review_started_at: string | null, merge_started_at: string | null, created_at: string, completed_at: string | null, updated_at: string, };
+export type TeamExecution = { id: string, epic_task_id: string, epic_workspace_id: string | null, status: TeamExecutionStatus, planner_output: string | null, planner_profile_id: string | null, max_parallel_workers: number, error_message: string | null, planned_at: string | null, execution_started_at: string | null, created_at: string, completed_at: string | null, updated_at: string, };
 
-export type CreateSwarmExecution = { epic_task_id: string, epic_workspace_id: string | null, planner_profile_id: string | null, reviewer_count: number | null, max_parallel_workers: number | null, };
+export type CreateTeamExecution = { epic_task_id: string, epic_workspace_id: string | null, planner_profile_id: string | null, max_parallel_workers: number | null, };
 
-export type UpdateSwarmExecution = { status: SwarmExecutionStatus | null, planner_output: string | null, error_message: string | null, consensus_approvals: number | null, consensus_rejections: number | null, };
+export type UpdateTeamExecution = { status: TeamExecutionStatus | null, planner_output: string | null, error_message: string | null, };
 
-export type SwarmPlanOutput = { complexity: string, requires_swarm: boolean, subtasks: Array<PlannedSubtask>, estimated_total_duration: number | null, reasoning: string, };
+export type TeamPlanOutput = { complexity: string, requires_team: boolean, subtasks: Array<PlannedSubtask>, estimated_total_duration: number | null, reasoning: string, };
 
 export type PlannedSubtask = { title: string, description: string, required_skills: Array<string>, depends_on: Array<number>, complexity: number, estimated_duration: number | null, };
 
-export type SwarmTaskStatus = "pending" | "blocked" | "assigned" | "running" | "completed" | "failed" | "skipped";
+export type TeamTaskStatus = "pending" | "blocked" | "assigned" | "running" | "completed" | "failed" | "skipped";
 
-export type SwarmTask = { id: string, swarm_execution_id: string, task_id: string, workspace_id: string | null, sequence_order: number, depends_on: string | null, required_skills: string | null, assigned_agent_profile_id: string | null, status: SwarmTaskStatus, branch_name: string | null, complexity: number, duration_seconds: number | null, error_message: string | null, retry_count: number, max_retries: number, started_at: string | null, completed_at: string | null, created_at: string, updated_at: string, };
+export type TeamTask = { id: string, team_execution_id: string, task_id: string, workspace_id: string | null, sequence_order: number, depends_on: string | null, required_skills: string | null, assigned_agent_profile_id: string | null, status: TeamTaskStatus, branch_name: string | null, complexity: number, duration_seconds: number | null, error_message: string | null, retry_count: number, max_retries: number, started_at: string | null, completed_at: string | null, created_at: string, updated_at: string, };
 
-export type CreateSwarmTask = { swarm_execution_id: string, task_id: string, sequence_order: number, depends_on: Array<string> | null, required_skills: Array<string> | null, complexity: number | null, max_retries: number | null, };
+export type CreateTeamTask = { team_execution_id: string, task_id: string, sequence_order: number, depends_on: Array<string> | null, required_skills: Array<string> | null, complexity: number | null, max_retries: number | null, };
 
-export type SwarmTaskWithDetails = { task_title: string, task_description: string | null, agent_name: string | null, id: string, swarm_execution_id: string, task_id: string, workspace_id: string | null, sequence_order: number, depends_on: string | null, required_skills: string | null, assigned_agent_profile_id: string | null, status: SwarmTaskStatus, branch_name: string | null, complexity: number, duration_seconds: number | null, error_message: string | null, retry_count: number, max_retries: number, started_at: string | null, completed_at: string | null, created_at: string, updated_at: string, };
+export type TeamTaskWithDetails = { task_title: string, task_description: string | null, agent_name: string | null, id: string, team_execution_id: string, task_id: string, workspace_id: string | null, sequence_order: number, depends_on: string | null, required_skills: string | null, assigned_agent_profile_id: string | null, status: TeamTaskStatus, branch_name: string | null, complexity: number, duration_seconds: number | null, error_message: string | null, retry_count: number, max_retries: number, started_at: string | null, completed_at: string | null, created_at: string, updated_at: string, };
 
-export type SwarmProgress = { total: number, completed: number, running: number, failed: number, pending: number, skipped: number, };
-
-export type ConsensusVote = "pending" | "approve" | "reject" | "abstain";
-
-export type ConsensusReview = { id: string, swarm_execution_id: string, reviewer_profile_id: string, session_id: string | null, vote: ConsensusVote, comments: string | null, structured_feedback: string | null, review_diff_hash: string | null, confidence: number | null, issues_found: string | null, suggested_fixes: string | null, round: number, started_at: string | null, completed_at: string | null, created_at: string, updated_at: string, };
-
-export type CreateConsensusReview = { swarm_execution_id: string, reviewer_profile_id: string, round: number | null, };
-
-export type SubmitReviewVote = { vote: ConsensusVote, comments: string | null, structured_feedback: string | null, confidence: number | null, issues_found: Array<string> | null, suggested_fixes: Array<string> | null, };
-
-export type ConsensusReviewWithProfile = { reviewer_name: string, reviewer_executor: string, id: string, swarm_execution_id: string, reviewer_profile_id: string, session_id: string | null, vote: ConsensusVote, comments: string | null, structured_feedback: string | null, review_diff_hash: string | null, confidence: number | null, issues_found: string | null, suggested_fixes: string | null, round: number, started_at: string | null, completed_at: string | null, created_at: string, updated_at: string, };
-
-export type ConsensusSummary = { total_reviewers: number, votes_cast: number, approvals: number, rejections: number, abstentions: number, pending: number, threshold: number, has_consensus: boolean, consensus_failed: boolean, };
+export type TeamProgress = { total: number, completed: number, running: number, failed: number, pending: number, skipped: number, };
 
 export type DraftFollowUpData = { message: string, executor_profile_id: ExecutorProfileId, };
 

@@ -1,0 +1,32 @@
+{
+  "db_name": "SQLite",
+  "query": "SELECT \n                    tasks.title AS \"task_title!: String\",\n                    tasks.description AS \"task_description: String\",\n                    agent_profiles.name AS \"agent_name: String\"\n                FROM team_tasks\n                JOIN tasks ON team_tasks.task_id = tasks.id\n                LEFT JOIN agent_profiles ON agent_profiles.id = team_tasks.assigned_agent_profile_id\n                WHERE team_tasks.id = $1",
+  "describe": {
+    "columns": [
+      {
+        "name": "task_title!: String",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "task_description: String",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "agent_name: String",
+        "ordinal": 2,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": [
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "fc4ebdd3c3c60f5c65b925a53c40540a59f5b789eb7d51aeb43ce1a19642588f"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT \n                id AS \"id!: Uuid\",\n                team_execution_id AS \"team_execution_id!: Uuid\",\n                task_id AS \"task_id!: Uuid\",\n                workspace_id AS \"workspace_id: Uuid\",\n                sequence_order,\n                depends_on,\n                required_skills,\n                assigned_agent_profile_id AS \"assigned_agent_profile_id: Uuid\",\n                status AS \"status!: TeamTaskStatus\",\n                branch_name,\n                complexity,\n                duration_seconds,\n                error_message,\n                retry_count,\n                max_retries,\n                started_at AS \"started_at: DateTime<Utc>\",\n                completed_at AS \"completed_at: DateTime<Utc>\",\n                created_at AS \"created_at!: DateTime<Utc>\",\n                updated_at AS \"updated_at!: DateTime<Utc>\"\n            FROM team_tasks\n            WHERE id = $1",
+  "query": "SELECT \n                id AS \"id!: Uuid\",\n                team_execution_id AS \"team_execution_id!: Uuid\",\n                task_id AS \"task_id!: Uuid\",\n                workspace_id AS \"workspace_id: Uuid\",\n                sequence_order AS \"sequence_order!: i32\",\n                depends_on,\n                required_skills,\n                assigned_agent_profile_id AS \"assigned_agent_profile_id: Uuid\",\n                status AS \"status!: TeamTaskStatus\",\n                branch_name,\n                complexity AS \"complexity!: i32\",\n                duration_seconds AS \"duration_seconds: i32\",\n                error_message,\n                retry_count AS \"retry_count!: i32\",\n                max_retries AS \"max_retries!: i32\",\n                started_at AS \"started_at: DateTime<Utc>\",\n                completed_at AS \"completed_at: DateTime<Utc>\",\n                created_at AS \"created_at!: DateTime<Utc>\",\n                updated_at AS \"updated_at!: DateTime<Utc>\"\n            FROM team_tasks\n            WHERE id = $1",
   "describe": {
     "columns": [
       {
@@ -24,7 +24,7 @@
         "type_info": "Text"
       },
       {
-        "name": "sequence_order",
+        "name": "sequence_order!: i32",
         "ordinal": 4,
         "type_info": "Integer"
       },
@@ -54,12 +54,12 @@
         "type_info": "Text"
       },
       {
-        "name": "complexity",
+        "name": "complexity!: i32",
         "ordinal": 10,
         "type_info": "Integer"
       },
       {
-        "name": "duration_seconds",
+        "name": "duration_seconds: i32",
         "ordinal": 11,
         "type_info": "Integer"
       },
@@ -69,12 +69,12 @@
         "type_info": "Text"
       },
       {
-        "name": "retry_count",
+        "name": "retry_count!: i32",
         "ordinal": 13,
         "type_info": "Integer"
       },
       {
-        "name": "max_retries",
+        "name": "max_retries!: i32",
         "ordinal": 14,
         "type_info": "Integer"
       },
@@ -124,5 +124,5 @@
       false
     ]
   },
-  "hash": "e890bd312352398a6fb18d82d0c084f9e2d5be98dfa2915d79a7eada26ca0a6d"
+  "hash": "5eae4d1769d8bb7d98d69c04cbf4ad5332e25772e41b39d431000241f3ff7912"
 }
