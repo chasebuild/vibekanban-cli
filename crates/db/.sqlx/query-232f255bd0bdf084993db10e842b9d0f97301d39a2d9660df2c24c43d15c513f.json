@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE team_tasks SET workspace_id = $2, branch_name = $3, updated_at = datetime('now', 'subsec') WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "232f255bd0bdf084993db10e842b9d0f97301d39a2d9660df2c24c43d15c513f"
+}

@@ -1,7 +1,5 @@
 PRAGMA foreign_keys=OFF;
 
-BEGIN;
-
 -- Create team_executions table
 CREATE TABLE team_executions (
     id TEXT PRIMARY KEY NOT NULL,
@@ -170,7 +168,5 @@ CREATE INDEX idx_team_tasks_team_execution ON team_tasks(team_execution_id);
 CREATE INDEX idx_team_tasks_task ON team_tasks(task_id);
 CREATE INDEX idx_team_tasks_status ON team_tasks(status);
 CREATE INDEX idx_team_tasks_sequence ON team_tasks(team_execution_id, sequence_order);
-
-COMMIT;
 
 PRAGMA foreign_keys=ON;

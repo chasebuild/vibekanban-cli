@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE team_executions SET status = $2, execution_started_at = $3, updated_at = $3 WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 3
+    },
+    "nullable": []
+  },
+  "hash": "021fe5fdf0bfbc6a5961b1076c0fbd5f1f6449184a638b9c20f59d94ff1c8059"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT \n                COUNT(*) AS \"total!: i64\",\n                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS \"completed!: i64\",\n                SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END) AS \"running!: i64\",\n                SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS \"failed!: i64\",\n                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) AS \"pending!: i64\",\n                SUM(CASE WHEN status = 'skipped' THEN 1 ELSE 0 END) AS \"skipped!: i64\"\n            FROM swarm_tasks\n            WHERE swarm_execution_id = $1",
+  "query": "SELECT \n                COUNT(*) AS \"total!: i64\",\n                SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) AS \"completed!: i64\",\n                SUM(CASE WHEN status = 'running' THEN 1 ELSE 0 END) AS \"running!: i64\",\n                SUM(CASE WHEN status = 'failed' THEN 1 ELSE 0 END) AS \"failed!: i64\",\n                SUM(CASE WHEN status = 'pending' OR status = 'assigned' THEN 1 ELSE 0 END) AS \"pending!: i64\",\n                SUM(CASE WHEN status = 'skipped' THEN 1 ELSE 0 END) AS \"skipped!: i64\"\n            FROM team_tasks\n            WHERE team_execution_id = $1",
   "describe": {
     "columns": [
       {
@@ -46,5 +46,5 @@
       true
     ]
   },
-  "hash": "bc40f0a6560b313225a28c385fa706538df9df5bee8cb5dfd2c97184f4c4e73b"
+  "hash": "2677d7fffd1770e663f6d3a992863c664058123bdf6fc848a7d8c2384e655391"
 }

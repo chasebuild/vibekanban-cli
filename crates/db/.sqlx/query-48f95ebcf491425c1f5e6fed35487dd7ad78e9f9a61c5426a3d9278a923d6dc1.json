@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE team_tasks SET status = 'pending', retry_count = retry_count + 1, error_message = NULL, started_at = NULL, completed_at = NULL, updated_at = datetime('now', 'subsec') WHERE id = $1 AND retry_count < max_retries",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "48f95ebcf491425c1f5e6fed35487dd7ad78e9f9a61c5426a3d9278a923d6dc1"
+}

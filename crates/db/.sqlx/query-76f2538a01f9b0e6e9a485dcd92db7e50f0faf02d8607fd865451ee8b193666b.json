@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE team_tasks SET \n                status = 'completed',\n                completed_at = datetime('now', 'subsec'),\n                updated_at = datetime('now', 'subsec')\n            WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 1
+    },
+    "nullable": []
+  },
+  "hash": "76f2538a01f9b0e6e9a485dcd92db7e50f0faf02d8607fd865451ee8b193666b"
+}

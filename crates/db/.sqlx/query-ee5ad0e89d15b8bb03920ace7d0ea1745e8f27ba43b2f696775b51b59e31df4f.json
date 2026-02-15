@@ -1,0 +1,92 @@
+{
+  "db_name": "SQLite",
+  "query": "INSERT INTO team_executions \n                (id, epic_task_id, epic_workspace_id, planner_profile_id, max_parallel_workers)\n            VALUES ($1, $2, $3, $4, $5)\n            RETURNING \n                id AS \"id!: Uuid\",\n                epic_task_id AS \"epic_task_id!: Uuid\",\n                epic_workspace_id AS \"epic_workspace_id: Uuid\",\n                status AS \"status!: TeamExecutionStatus\",\n                planner_output,\n                planner_profile_id AS \"planner_profile_id: Uuid\",\n                max_parallel_workers AS \"max_parallel_workers!: i32\",\n                error_message,\n                planned_at AS \"planned_at: DateTime<Utc>\",\n                execution_started_at AS \"execution_started_at: DateTime<Utc>\",\n                created_at AS \"created_at!: DateTime<Utc>\",\n                completed_at AS \"completed_at: DateTime<Utc>\",\n                updated_at AS \"updated_at!: DateTime<Utc>\"",
+  "describe": {
+    "columns": [
+      {
+        "name": "id!: Uuid",
+        "ordinal": 0,
+        "type_info": "Text"
+      },
+      {
+        "name": "epic_task_id!: Uuid",
+        "ordinal": 1,
+        "type_info": "Text"
+      },
+      {
+        "name": "epic_workspace_id: Uuid",
+        "ordinal": 2,
+        "type_info": "Text"
+      },
+      {
+        "name": "status!: TeamExecutionStatus",
+        "ordinal": 3,
+        "type_info": "Text"
+      },
+      {
+        "name": "planner_output",
+        "ordinal": 4,
+        "type_info": "Text"
+      },
+      {
+        "name": "planner_profile_id: Uuid",
+        "ordinal": 5,
+        "type_info": "Text"
+      },
+      {
+        "name": "max_parallel_workers!: i32",
+        "ordinal": 6,
+        "type_info": "Integer"
+      },
+      {
+        "name": "error_message",
+        "ordinal": 7,
+        "type_info": "Text"
+      },
+      {
+        "name": "planned_at: DateTime<Utc>",
+        "ordinal": 8,
+        "type_info": "Text"
+      },
+      {
+        "name": "execution_started_at: DateTime<Utc>",
+        "ordinal": 9,
+        "type_info": "Text"
+      },
+      {
+        "name": "created_at!: DateTime<Utc>",
+        "ordinal": 10,
+        "type_info": "Text"
+      },
+      {
+        "name": "completed_at: DateTime<Utc>",
+        "ordinal": 11,
+        "type_info": "Text"
+      },
+      {
+        "name": "updated_at!: DateTime<Utc>",
+        "ordinal": 12,
+        "type_info": "Text"
+      }
+    ],
+    "parameters": {
+      "Right": 5
+    },
+    "nullable": [
+      false,
+      false,
+      true,
+      false,
+      true,
+      true,
+      false,
+      true,
+      true,
+      true,
+      false,
+      true,
+      false
+    ]
+  },
+  "hash": "ee5ad0e89d15b8bb03920ace7d0ea1745e8f27ba43b2f696775b51b59e31df4f"
+}

@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT \n                id AS \"id!: Uuid\",\n                swarm_execution_id AS \"swarm_execution_id!: Uuid\",\n                task_id AS \"task_id!: Uuid\",\n                workspace_id AS \"workspace_id: Uuid\",\n                sequence_order AS \"sequence_order!: i32\",\n                depends_on,\n                required_skills,\n                assigned_agent_profile_id AS \"assigned_agent_profile_id: Uuid\",\n                status AS \"status!: SwarmTaskStatus\",\n                branch_name,\n                complexity AS \"complexity!: i32\",\n                duration_seconds AS \"duration_seconds: i32\",\n                error_message,\n                retry_count AS \"retry_count!: i32\",\n                max_retries AS \"max_retries!: i32\",\n                started_at AS \"started_at: DateTime<Utc>\",\n                completed_at AS \"completed_at: DateTime<Utc>\",\n                created_at AS \"created_at!: DateTime<Utc>\",\n                updated_at AS \"updated_at!: DateTime<Utc>\"\n            FROM swarm_tasks\n            WHERE swarm_execution_id = $1\n            ORDER BY sequence_order",
+  "query": "SELECT \n                id AS \"id!: Uuid\",\n                team_execution_id AS \"team_execution_id!: Uuid\",\n                task_id AS \"task_id!: Uuid\",\n                workspace_id AS \"workspace_id: Uuid\",\n                sequence_order,\n                depends_on,\n                required_skills,\n                assigned_agent_profile_id AS \"assigned_agent_profile_id: Uuid\",\n                status AS \"status!: TeamTaskStatus\",\n                branch_name,\n                complexity,\n                duration_seconds,\n                error_message,\n                retry_count,\n                max_retries,\n                started_at AS \"started_at: DateTime<Utc>\",\n                completed_at AS \"completed_at: DateTime<Utc>\",\n                created_at AS \"created_at!: DateTime<Utc>\",\n                updated_at AS \"updated_at!: DateTime<Utc>\"\n            FROM team_tasks\n            WHERE team_execution_id = $1 AND status = 'pending'\n            ORDER BY sequence_order",
   "describe": {
     "columns": [
       {
@@ -9,7 +9,7 @@
         "type_info": "Text"
       },
       {
-        "name": "swarm_execution_id!: Uuid",
+        "name": "team_execution_id!: Uuid",
         "ordinal": 1,
         "type_info": "Text"
       },
@@ -24,7 +24,7 @@
         "type_info": "Text"
       },
       {
-        "name": "sequence_order!: i32",
+        "name": "sequence_order",
         "ordinal": 4,
         "type_info": "Integer"
       },
@@ -44,7 +44,7 @@
         "type_info": "Text"
       },
       {
-        "name": "status!: SwarmTaskStatus",
+        "name": "status!: TeamTaskStatus",
         "ordinal": 8,
         "type_info": "Text"
       },
@@ -54,12 +54,12 @@
         "type_info": "Text"
       },
       {
-        "name": "complexity!: i32",
+        "name": "complexity",
         "ordinal": 10,
         "type_info": "Integer"
       },
       {
-        "name": "duration_seconds: i32",
+        "name": "duration_seconds",
         "ordinal": 11,
         "type_info": "Integer"
       },
@@ -69,12 +69,12 @@
         "type_info": "Text"
       },
       {
-        "name": "retry_count!: i32",
+        "name": "retry_count",
         "ordinal": 13,
         "type_info": "Integer"
       },
       {
-        "name": "max_retries!: i32",
+        "name": "max_retries",
         "ordinal": 14,
         "type_info": "Integer"
       },
@@ -124,5 +124,5 @@
       false
     ]
   },
-  "hash": "9c4d1ae96d3622929dc6932ec975aeae6ad3b780dc65a934a5aa783210ff5f1f"
+  "hash": "2e4ac28f05ea7a5b8f41981862894a998034cd4ddb0ae2fa563a92b3d5bf0787"
 }

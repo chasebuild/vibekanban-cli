@@ -1,0 +1,12 @@
+{
+  "db_name": "SQLite",
+  "query": "UPDATE team_tasks SET assigned_agent_profile_id = $2, status = 'assigned', updated_at = datetime('now', 'subsec') WHERE id = $1",
+  "describe": {
+    "columns": [],
+    "parameters": {
+      "Right": 2
+    },
+    "nullable": []
+  },
+  "hash": "cad6cd03e68e52add4611675fae634432f5f0758afaa0ec6b5057454614524f4"
+}

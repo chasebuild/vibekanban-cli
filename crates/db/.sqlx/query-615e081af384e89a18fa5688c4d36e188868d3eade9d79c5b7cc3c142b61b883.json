@@ -1,6 +1,6 @@
 {
   "db_name": "SQLite",
-  "query": "SELECT COUNT(*) AS \"count!: i64\" FROM swarm_tasks \n               WHERE swarm_execution_id = $1 AND status NOT IN ('completed', 'skipped')",
+  "query": "SELECT COUNT(*) AS \"count!: i64\" FROM team_tasks \n               WHERE team_execution_id = $1 AND status NOT IN ('completed', 'skipped')",
   "describe": {
     "columns": [
       {
@@ -16,5 +16,5 @@
       false
     ]
   },
-  "hash": "2f8ebbbe4c89c54ce7f433650993ea786ba986c8701fd3bc10f48271714e7397"
+  "hash": "615e081af384e89a18fa5688c4d36e188868d3eade9d79c5b7cc3c142b61b883"
 }
