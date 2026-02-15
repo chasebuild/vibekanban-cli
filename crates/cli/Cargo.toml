@@ -16,9 +16,8 @@ reqwest = { workspace = true, features = ["json"] }
 serde = { workspace = true }
 serde_json = { workspace = true }
 
-# TUI framework
-ratatui = "0.29"
-crossterm = { version = "0.28", features = ["event-stream"] }
+# Terminal rendering (non-curses)
+crossterm = "0.28"
 
 # Error handling
 anyhow = { workspace = true }
@@ -46,6 +45,12 @@ url = "2.5"
 
 # TLS crypto provider (required for reqwest with rustls)
 rustls = { workspace = true }
+
+# JSON patch handling for streaming updates
+json-patch = "2.0"
+
+# Slug matching for task titles
+regex = "1.11.1"
 
 [lints.clippy]
 uninlined-format-args = "allow"

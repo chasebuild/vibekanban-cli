@@ -9,7 +9,6 @@
 pub mod api;
 pub mod app;
 pub mod types;
-pub mod ui;
 
 pub use api::VibeKanbanClient;
 pub use app::App;
