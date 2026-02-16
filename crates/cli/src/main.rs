@@ -8,14 +8,15 @@ mod watch;
 
 use anyhow::{Context, Result, anyhow};
 use clap::Parser;
+use serde_json;
 
 use vibe_kanban_cli::{
     VibeKanbanClient,
-    types::{CreateAndStartTaskRequest, CreateTask, ExecutorProfileId},
+    types::{CreateAndStartTaskRequest, CreateProject, CreateProjectRepo, CreateTask, ExecutorProfileId},
 };
 
 use crate::{
-    cli_args::{Args, Command, ServerCommand},
+    cli_args::{Args, Command, ProjectCommand, ServerCommand},
     resolve::{parse_uuid, resolve_project, resolve_repo_inputs},
     utils::{truncate_title},
     watch::{WatchFilter, watch_tasks},
@@ -129,6 +130,53 @@ async fn main() -> Result<()> {
 
             watch_tasks(&client, &args.server, filter, project).await?;
         }
+        Command::Projects { json } => {
+            let projects = client.list_projects().await?;
+            if json {
+                println!("{}", serde_json::to_string_pretty(&projects)?);
+            } else if projects.is_empty() {
+                println!("No projects found.");
+            } else {
+                println!("Projects:");
+                for project in projects {
+                    println!("  {}  {}", project.id, project.name);
+                }
+            }
+        }
+        Command::Project { command } => match command {
+            ProjectCommand::Add {
+                path,
+                name,
+                display_name,
+            } => {
+                let repo_path = std::fs::canonicalize(&path)
+                    .with_context(|| format!("Invalid path: {}", path))?;
+                let repo_path_str = repo_path
+                    .to_str()
+                    .ok_or_else(|| anyhow!("Path contains invalid UTF-8"))?
+                    .to_string();
+
+                let folder_name = repo_path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .ok_or_else(|| anyhow!("Unable to determine folder name for {}", repo_path_str))?
+                    .to_string();
+
+                let project_name = name.unwrap_or(folder_name.clone());
+                let repo_display_name = display_name.unwrap_or(project_name.clone());
+
+                let payload = CreateProject {
+                    name: project_name,
+                    repositories: vec![CreateProjectRepo {
+                        display_name: repo_display_name,
+                        git_repo_path: repo_path_str,
+                    }],
+                };
+
+                let created = client.create_project(&payload).await?;
+                println!("Created project {} ({})", created.name, created.id);
+            }
+        },
         Command::Server { command } => match command {
             ServerCommand::Start {
                 command,

@@ -73,10 +73,37 @@ pub enum Command {
         #[arg(long)]
         slug: Option<String>,
     },
+    /// List projects available on the server
+    Projects {
+        /// Output as JSON
+        #[arg(long)]
+        json: bool,
+    },
+    /// Manage projects
+    Project {
+        #[command(subcommand)]
+        command: ProjectCommand,
+    },
     /// Manage a local Vibe Kanban server process
     Server {
         #[command(subcommand)]
         command: ServerCommand,
+    },
+}
+
+#[derive(Subcommand, Debug)]
+pub enum ProjectCommand {
+    /// Add a project from a local repository path
+    Add {
+        /// Path to the repository (use '.' for current directory)
+        #[arg(default_value = ".")]
+        path: String,
+        /// Override project name (defaults to folder name)
+        #[arg(long)]
+        name: Option<String>,
+        /// Override repository display name (defaults to project name)
+        #[arg(long)]
+        display_name: Option<String>,
     },
 }
 

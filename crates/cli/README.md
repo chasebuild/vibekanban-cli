@@ -14,6 +14,30 @@ cargo install vibe-kanban-cli
 vibe-kanban-cli --help
 ```
 
+## List projects
+
+```bash
+vibe-kanban-cli projects
+```
+
+JSON output:
+
+```bash
+vibe-kanban-cli projects --json
+```
+
+## Add project from current folder
+
+```bash
+vibe-kanban-cli project add .
+```
+
+Override the project name:
+
+```bash
+vibe-kanban-cli project add . --name "My Project"
+```
+
 ## Start the server (background)
 
 ```bash
