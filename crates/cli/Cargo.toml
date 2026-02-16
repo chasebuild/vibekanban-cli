@@ -1,6 +1,6 @@
 [package]
 name = "vibe-kanban-cli"
-version = "0.1.1"
+version = "0.1.2"
 edition = "2024"
 description = "Interactive CLI for Vibe Kanban"
 authors = ["Vibe Kanban Team"]
