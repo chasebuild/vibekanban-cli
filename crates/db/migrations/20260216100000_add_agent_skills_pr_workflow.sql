@@ -1,0 +1,5 @@
+-- Add workflow-oriented agent skills
+INSERT OR IGNORE INTO agent_skills (id, name, description, prompt_modifier, category) VALUES
+    ('00000000-0000-0000-0000-000000000010', 'pr-workflow', 'PR workflow: branch hygiene, small PRs, clear descriptions, review readiness', 'You are an expert at pull request workflow. Keep changes small, include clear PR summaries, ensure review readiness, and follow repository PR conventions.', 'process'),
+    ('00000000-0000-0000-0000-000000000011', 'atomic-commits', 'Atomic commits: one logical change per commit, focused diffs, rollback-friendly history', 'You are disciplined about atomic commits. Split work into single-purpose commits with clear messages and minimal scope.', 'process'),
+    ('00000000-0000-0000-0000-000000000012', 'auto-commit', 'Auto-commit: create commits when changes are clear, scoped, and validated', 'When appropriate, create commits automatically after verifying changes and tests, using clear messages and atomic grouping.', 'process');
