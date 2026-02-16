@@ -49,3 +49,9 @@ If you need a custom command, pass `--command`:
 ```bash
 vibe-kanban-cli server start --background --command "cargo run --bin server"
 ```
+
+To set a specific backend port:
+
+```bash
+vibe-kanban-cli server start --background --port 3100
+```

@@ -85,3 +85,5 @@ dev_assets
 vibe-kanban-cloud/
 
 .jj
+
+**.log

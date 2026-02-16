@@ -181,9 +181,10 @@ async fn main() -> Result<()> {
             ServerCommand::Start {
                 command,
                 background,
+                port,
                 log,
             } => {
-                start_server(&command, background, &log)?;
+                start_server(&command, background, port, &log)?;
             }
         },
     }
@@ -191,9 +192,20 @@ async fn main() -> Result<()> {
     Ok(())
 }
 
-fn start_server(command: &str, background: bool, log_path: &str) -> Result<()> {
+fn start_server(
+    command: &str,
+    background: bool,
+    port: Option<u16>,
+    log_path: &str,
+) -> Result<()> {
     use std::fs::OpenOptions;
     use std::process::{Command, Stdio};
+
+    let resolved_port = port.or_else(|| {
+        std::env::var("SERVER_PORT")
+            .ok()
+            .and_then(|value| value.parse::<u16>().ok())
+    });
 
     if background {
         let log_file = OpenOptions::new()
@@ -202,9 +214,14 @@ fn start_server(command: &str, background: bool, log_path: &str) -> Result<()> {
             .open(log_path)
             .with_context(|| format!("Failed to open log file {}", log_path))?;
 
-        let mut child = Command::new("bash")
-            .arg("-lc")
-            .arg(command)
+        let mut cmd = Command::new("bash");
+        cmd.arg("-lc").arg(command);
+        if let Some(port) = resolved_port {
+            cmd.env("SERVER_PORT", port.to_string());
+            cmd.env("BACKEND_PORT", port.to_string());
+        }
+
+        let mut child = cmd
             .stdin(Stdio::null())
             .stdout(log_file.try_clone()?)
             .stderr(log_file)
@@ -218,9 +235,14 @@ fn start_server(command: &str, background: bool, log_path: &str) -> Result<()> {
         );
         Ok(())
     } else {
-        let status = Command::new("bash")
-            .arg("-lc")
-            .arg(command)
+        let mut cmd = Command::new("bash");
+        cmd.arg("-lc").arg(command);
+        if let Some(port) = resolved_port {
+            cmd.env("SERVER_PORT", port.to_string());
+            cmd.env("BACKEND_PORT", port.to_string());
+        }
+
+        let status = cmd
             .stdin(Stdio::inherit())
             .stdout(Stdio::inherit())
             .stderr(Stdio::inherit())

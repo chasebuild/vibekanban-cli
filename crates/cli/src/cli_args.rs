@@ -117,6 +117,9 @@ pub enum ServerCommand {
         /// Run in the background
         #[arg(long)]
         background: bool,
+        /// Backend server port (sets SERVER_PORT and BACKEND_PORT)
+        #[arg(long)]
+        port: Option<u16>,
         /// Log file path (used only when --background is set)
         #[arg(long, default_value = "vibe-kanban-server.log")]
         log: String,
